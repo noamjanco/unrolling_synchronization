@@ -14,3 +14,20 @@ def rel_error_z_over_2(y_true: np.array, y_pred: np.array) -> float:
     err = 1 / 4 * tf.reduce_mean(tf.math.minimum(tf.reduce_mean(tf.pow(y_true - y_pred, 2), axis=1),
                                                  tf.reduce_mean(tf.pow(y_true + y_pred, 2), axis=1)))
     return err
+
+
+def rel_error_u_1(y_true: np.array, y_pred: np.array) -> float:
+    """
+    Computes the relative error between two vectors in U(1). Vectors might be the same up to phase shift.
+    :param y_true: True vector
+    :param y_pred: Predicted vector
+    :return: a float indicating the error up to orbit between the true and predicted vectors
+    """
+    err = 1 - np.abs(np.vdot(y_true,y_pred))/y_true.shape[0]
+    return err
+
+
+def normalize(z):
+    z_normalized = z / np.abs(z)
+    z_normalized[z_normalized == 0] = 0
+    return z_normalized
