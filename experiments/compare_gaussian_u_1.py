@@ -55,7 +55,7 @@ class CompareU1Experiment(Experiment):
                                               'N': N})
                                 ]
                                , ignore_index=True)
-            self.results = df
+        self.results = df
 
     def plot_results(self):
         df = self.results

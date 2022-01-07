@@ -18,6 +18,29 @@ def generate_data_z_over_2(N: int, Lambda: float) -> [np.array, np.array]:
     return x, Y
 
 
+def generate_training_data_z_over_2(N: int, Lambda: float, R: int) -> [np.array, np.array]:
+    """
+    Generate training data for Z/2, the training data consists of R trials
+    :param N: Number of observations in each trial, also the length of the vector x
+    :param Lambda: Signal-to-noise ratio (SNR) parameter
+    :param R: Number of trials
+    :return: x_total - set of vector we wish to estimate, x in {+-1}^N,
+             Y_total - R x N x N relative measurements matrix
+    """
+    Y_total = []
+    x_total = []
+    for r in range(R):
+        x, Y = generate_data_z_over_2(N, Lambda)
+        x_total.append(x)
+        Y_total.append(Y)
+
+    x_total = np.asarray(x_total)
+    Y_total = np.asarray(Y_total)
+
+    print('Finished generating training data')
+    return x_total, Y_total
+
+
 def generate_data_gaussian(N: int, Lambda: float, L: int) -> [np.array, np.array, np.array]:
     """
     Generate target rotations vector x and relative rotations Y, and discrete matching shifts in U(1) gaussian scenario.

@@ -1,9 +1,13 @@
 from experiments.compare_gaussian_u_1 import CompareU1Experiment
 from experiments.compare_z_over_2 import CompareZOver2Experiment
+from experiments.compare_z_over_2_unrolling import CompareZOver2UnrollingExperiment
 import numpy as np
 
 
 if __name__ == '__main__':
     CompareZOver2Experiment(params={'N': 2000, 'R': 10, 'Lambda_range': np.arange(1.2, 3.2, 0.2), 'seed': 2})
     CompareU1Experiment(params={'N': 20, 'R': 100, 'Lambda_range': np.arange(.4,3.,0.2), 'seed': 1, 'L': 10, 'tol': 1e-3})
+    CompareZOver2UnrollingExperiment(params={'N': 20, 'R': 5000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 1.25})
+    CompareZOver2UnrollingExperiment(params={'N': 20, 'R': 5000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 1.5})
+    CompareZOver2UnrollingExperiment(params={'N': 20, 'R': 5000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 2})
 
