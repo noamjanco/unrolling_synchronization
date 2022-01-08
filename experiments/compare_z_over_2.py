@@ -79,6 +79,7 @@ class CompareZOver2Experiment(Experiment):
         # plt.show()
         plt.savefig(self.get_results_path()+'.eps')
         plt.savefig(self.get_results_path()+'.png')
+        plt.clf()
 
 
 if __name__ == '__main__':
