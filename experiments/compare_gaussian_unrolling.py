@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from data_generation.generate_data import generate_training_data_gaussian
 from experiments.base_experiment import Experiment
-from models.unrolling_synchronization_gaussian import BuildModel, TrainModel, EvaluateModel, loss_u_1
+from models.unrolling_synchronization_gaussian import BuildModel, TrainModel, EvaluateModel, loss_u_1_complex
 from synchronization.ppm import ppm_u_1
 from synchronization.pim import pim_u_1
 from synchronization.amp import amp_u_1
@@ -39,7 +39,7 @@ def task(N, R, Lambda, DEPTH, seed, epochs, L):
         z,num_iter = ppm_u_1(Y[r], x_init[r,:], max_iterations=DEPTH)
         z_total.append(z)
     z1 = np.asarray(z_total)
-    loss_ppm = loss_u_1(x.astype(np.csingle), z1.astype(np.csingle))
+    loss_ppm = loss_u_1_complex(x.astype(np.csingle), z1.astype(np.csingle))
     print('[PPM] loss = %f' % loss_ppm)
 
     z_total = []
@@ -47,7 +47,7 @@ def task(N, R, Lambda, DEPTH, seed, epochs, L):
         z, num_iter = pim_u_1(Y[r], x_init[r, :], max_iterations=DEPTH)
         z_total.append(z)
     z1 = np.asarray(z_total)
-    loss_pim = loss_u_1(x.astype(np.csingle), z1.astype(np.csingle))
+    loss_pim = loss_u_1_complex(x.astype(np.csingle), z1.astype(np.csingle))
     print('[PIM] loss = %f' % loss_pim)
 
     z_total = []
@@ -55,7 +55,7 @@ def task(N, R, Lambda, DEPTH, seed, epochs, L):
         z, num_iter = amp_u_1(Y[r], x_init[r,:], x_init2[r,:], Lambda, max_iterations=DEPTH)
         z_total.append(z)
     z1 = np.asarray(z_total)
-    loss_amp = loss_u_1(x.astype(np.csingle), z1.astype(np.csingle))
+    loss_amp = loss_u_1_complex(x.astype(np.csingle), z1.astype(np.csingle))
     print('[AMP] loss = %f' % loss_amp)
 
     return loss_ppm, loss_pim, loss_amp, loss_nn

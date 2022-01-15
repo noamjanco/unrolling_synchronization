@@ -57,6 +57,15 @@ def loss_u_1(y_true,y_pred):
     loss = 1 - tf.reduce_mean(tf.math.sqrt(tf.math.pow(p_r, 2) + tf.math.pow(p_i, 2)))/y_true.shape[1]
     return loss
 
+def loss_u_1_complex(y_true,y_pred):
+    y_true_r = y_true.real
+    y_true_i = y_true.imag
+    y_pred_r = y_pred.real
+    y_pred_i = y_pred.imag
+    p_r = tf.math.reduce_sum(tf.math.multiply(y_true_r, y_pred_r) + tf.math.multiply(y_true_i, y_pred_i), axis=1)
+    p_i = tf.math.reduce_sum(tf.math.multiply(y_true_r, y_pred_i) - tf.math.multiply(y_true_i, y_pred_r), axis=1)
+    loss = 1 - tf.reduce_mean(tf.math.sqrt(tf.math.pow(p_r, 2) + tf.math.pow(p_i, 2))) / y_true.shape[1]
+    return loss
 
 def BuildModel(N,Lambda,DEPTH):
     v_in_r = keras.layers.Input((N, 1))
@@ -96,8 +105,8 @@ def EvaluateModel(model, Y, x, x_init, x_init2):
     x_est = model.predict([x_init.real,x_init.imag, x_init2.real, x_init2.imag, Y.real,Y.imag])
     x_est_norm = tf.math.sqrt(tf.reduce_sum(tf.math.pow(x_est, 2), axis=-1))
     x_est = x_est / np.expand_dims(x_est_norm, axis=-1)
-    x = np.concatenate([x.real, x.imag], axis=-1)
-    loss = loss_u_1(x.astype(np.float32), x_est)
+    # x = np.concatenate([x.real, x.imag], axis=-1)
+    loss = loss_u_1_complex(x, x_est)
     print('[NN] loss = %lf' % loss)
     return x_est, loss
 
