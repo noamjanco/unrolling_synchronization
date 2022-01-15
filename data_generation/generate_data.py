@@ -103,6 +103,24 @@ def generate_data_gaussian(N: int, Lambda: float, L: int) -> [np.array, np.array
     return x, Y, s
 
 
+def generate_training_data_gaussian(N: int, Lambda: float, R: int, L: int):
+    Y_total = []
+    x_total = []
+    s_total = []
+    for r in range(R):
+        x, Y, s = generate_data_gaussian(N, Lambda, L)
+        Y_total.append(Y)
+        x_total.append(x)
+        s_total.append(s)
+
+    Y_total = np.asarray(Y_total)
+    x_total = np.asarray(x_total)
+    s_total = np.asarray(s_total)
+
+    print('Finished generating training data')
+    return s_total, Y_total, x_total
+
+
 def generate_data_antipodal(N: int, Lambda: float, L: int) -> [np.array, np.array, np.array, np.array]:
     """
     Generate target flip vector s and relative measurements H in U(1) antipodal signal model.

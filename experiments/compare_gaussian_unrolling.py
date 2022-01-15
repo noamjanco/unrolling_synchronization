@@ -1,69 +1,66 @@
 import numpy as np
 import pandas as pd
-from data_generation.generate_data import generate_training_data_antipodal_reconstruction
+from data_generation.generate_data import generate_training_data_gaussian
 from experiments.base_experiment import Experiment
-from models.unrolling_synchronization_antipodal_reconstruction_loss import BuildModel, TrainModel, EvaluateModel, loss_z_over_2, reconstruction_loss_z_over_2
-from synchronization.ppm import ppm_z_over_2
-from synchronization.pim import pim_z_over_2
-from synchronization.amp import amp_z_over_2
+from models.unrolling_synchronization_gaussian import BuildModel, TrainModel, EvaluateModel, loss_u_1
+from synchronization.ppm import ppm_u_1
+from synchronization.pim import pim_u_1
+from synchronization.amp import amp_u_1
 import matplotlib.pyplot as plt
-import tensorflow as tf
 
 
 def task(N, R, Lambda, DEPTH, seed, epochs, L):
-    #todo: test with reconstruction_loss_z_over_2
     # Initialize random seed
     np.random.seed(seed)
-    v, Y, y, x = generate_training_data_antipodal_reconstruction(N,Lambda,R, L)
+    s, Y, x = generate_training_data_gaussian(N,Lambda,R, L)
 
-    model = BuildModel(L, N,Lambda,DEPTH)
-    x_init = 1e-1*np.expand_dims(np.random.rand(R,N),axis=-1)
-    x_init2 = 1e-1*np.expand_dims(np.random.rand(R,N),axis=-1)
-    v_val, Y_val, y_val, x_val  = generate_training_data_antipodal_reconstruction(N,Lambda,R, L)
-    x_val_init = 1e-1 * np.expand_dims(np.random.rand(R, N), axis=-1)
-    x_val_init2 = 1e-1 * np.expand_dims(np.random.rand(R, N), axis=-1)
-    TrainModel(model, Y,y, x, x_init,x_init2,Y_val,y_val, x_val, x_val_init,x_val_init2, epochs)
+    model = BuildModel(N, Lambda, DEPTH)
+    x_init = 1e-2 * (np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
+    x_init2 = 1e-2 * (
+    np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
+    s_val, Y_val, x_val = generate_training_data_gaussian(N,Lambda,R, L)
+    x_val_init = 1e-2 * (
+    np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
+    x_val_init2 = 1e-2 * (
+    np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
+    TrainModel(model, Y.real, Y.imag, x.real, x.imag, x_init.real, x_init.imag,
+               x_init2.real, x_init2.imag, Y_val.real, Y_val.imag, x_val.real, x_val.imag,
+               x_val_init.real, x_val_init.imag, x_val_init2.real, x_val_init2.imag, epochs)
 
     # Generate test data
-    v, Y, y, x = generate_training_data_antipodal_reconstruction(N,Lambda,R, L)
-    x_init = 1e-1*np.expand_dims(np.random.rand(R,N),axis=-1)
-    x_init2 = 1e-1*np.expand_dims(np.random.rand(R,N),axis=-1)
-    x_est, loss_nn = EvaluateModel(model, Y,y, x, x_init, x_init2)
+    s, Y, x = generate_training_data_gaussian(N,Lambda,R, L)
+    x_init = 1e-2 * (np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
+    x_init2 = 1e-2 * (
+    np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
+    x_est, loss_nn = EvaluateModel(model, Y, x, x_init, x_init2)
 
     z_total = []
     for r in range(R):
-        z, num_iter = ppm_z_over_2(Y[r], x_init[r,:], max_iterations=DEPTH)
+        z,num_iter = ppm_u_1(Y[r], x_init[r,:], max_iterations=DEPTH)
         z_total.append(z)
     z1 = np.asarray(z_total)
-    x_est = tf.reduce_mean(y * tf.repeat(tf.expand_dims(tf.squeeze(z1, axis=-1), axis=1), L, axis=1), axis=-1)
-    loss_ppm = reconstruction_loss_z_over_2(x.astype(np.float32), x_est)
-    # loss_ppm = loss_z_over_2(x.astype(np.float32), x_est)
-
+    loss_ppm = loss_u_1(x.astype(np.csingle), z1.astype(np.csingle))
     print('[PPM] loss = %f' % loss_ppm)
 
     z_total = []
     for r in range(R):
-        z, num_iter = pim_z_over_2(Y[r], x_init[r, :], max_iterations=DEPTH)
+        z, num_iter = pim_u_1(Y[r], x_init[r, :], max_iterations=DEPTH)
         z_total.append(z)
     z1 = np.asarray(z_total)
-    x_est = tf.reduce_mean(y * tf.repeat(tf.expand_dims(tf.squeeze(z1, axis=-1), axis=1), L, axis=1), axis=-1)
-    loss_pim = reconstruction_loss_z_over_2(x.astype(np.float32), x_est)
-    # loss_pim = loss_z_over_2(x.astype(np.float32), x_est)
+    loss_pim = loss_u_1(x.astype(np.csingle), z1.astype(np.csingle))
     print('[PIM] loss = %f' % loss_pim)
 
     z_total = []
     for r in range(R):
-        z, num_iter = amp_z_over_2(Y[r], x_init[r,:], x_init2[r,:], Lambda, max_iterations=DEPTH)
+        z, num_iter = amp_u_1(Y[r], x_init[r,:], x_init2[r,:], Lambda, max_iterations=DEPTH)
         z_total.append(z)
     z1 = np.asarray(z_total)
-    x_est = tf.reduce_mean(y * tf.repeat(tf.expand_dims(tf.squeeze(z1, axis=-1), axis=1), L, axis=1), axis=-1)
-    loss_amp = reconstruction_loss_z_over_2(x.astype(np.float32), x_est)
-    # loss_amp = loss_z_over_2(x.astype(np.float32), x_est)
+    loss_amp = loss_u_1(x.astype(np.csingle), z1.astype(np.csingle))
     print('[AMP] loss = %f' % loss_amp)
 
     return loss_ppm, loss_pim, loss_amp, loss_nn
 
-class CompareAntipodalUnrollingReconstructionLossExperiment(Experiment):
+class CompareGaussianUnrollingExperiment(Experiment):
     def __init__(self, params: dict):
         super().__init__(params=params)
 
@@ -112,5 +109,4 @@ class CompareAntipodalUnrollingReconstructionLossExperiment(Experiment):
 
 
 if __name__ == '__main__':
-    # CompareAntipodalUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 0.4, 'L': 21})
-    CompareAntipodalUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 5, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 0.4, 'L': 21})
+    CompareGaussianUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9], 'epochs': 300, 'Lambda': 1.5, 'L': 10})
