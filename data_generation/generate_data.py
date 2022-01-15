@@ -103,7 +103,7 @@ def generate_data_gaussian(N: int, Lambda: float, L: int) -> [np.array, np.array
     return x, Y, s
 
 
-def generate_data_antipodal(N: int, Lambda: float, L: int) -> [np.array, np.array]:
+def generate_data_antipodal(N: int, Lambda: float, L: int) -> [np.array, np.array, np.array, np.array]:
     """
     Generate target flip vector s and relative measurements H in U(1) antipodal signal model.
 
@@ -112,6 +112,8 @@ def generate_data_antipodal(N: int, Lambda: float, L: int) -> [np.array, np.arra
     :param L: Number of possible rotations - corresponds to the length of a vector in MRA experiments.
     :return: s - vector we wish to estimate, x in {+-1}^N,
              H - N x N relative measurements matrix
+             y - N x L measurements matrix
+             x - Unknown signal
     """
     x = np.random.randn(L)
     y = np.zeros((L, N))
@@ -129,7 +131,7 @@ def generate_data_antipodal(N: int, Lambda: float, L: int) -> [np.array, np.arra
         for m in range(N):
             H[n, m] = Lambda / N * y[:,n] @ y[:,m].T
 
-    return np.expand_dims(s,axis=-1).astype(np.float32), H
+    return np.expand_dims(s,axis=-1).astype(np.float32), H, y, x
 
 
 def generate_training_data_antipodal(N: int, Lambda: float, R: int, L: int) -> [np.array, np.array]:
@@ -144,7 +146,7 @@ def generate_training_data_antipodal(N: int, Lambda: float, R: int, L: int) -> [
     Y_total = []
     x_total = []
     for r in range(R):
-        x, Y = generate_data_antipodal(N, Lambda, L)
+        x, Y, _, _ = generate_data_antipodal(N, Lambda, L)
         x_total.append(x)
         Y_total.append(Y)
 
@@ -153,3 +155,33 @@ def generate_training_data_antipodal(N: int, Lambda: float, R: int, L: int) -> [
 
     print('Finished generating training data')
     return x_total, Y_total
+
+def generate_training_data_antipodal_reconstruction(N: int, Lambda: float, R: int, L: int) -> [np.array, np.array, np.array, np.array]:
+    """
+    Generate training data for Z/2, the training data consists of R trials
+    :param N: Number of observations in each trial, also the length of the vector x
+    :param Lambda: Signal-to-noise ratio (SNR) parameter
+    :param R: Number of trials
+    :return: s_total - set of rotation vector we wish to estimate, s in {+-1}^N,
+             Y_total - R x N x N relative measurements matrix
+             y_total - measured noisy and rotated signal, R X N X L
+             x_total - Ground truth signal , R X L
+    """
+    Y_total = []
+    s_total = []
+    y_total = []
+    x_total = []
+    for r in range(R):
+        s, Y, y, x = generate_data_antipodal(N, Lambda, L)
+        s_total.append(s)
+        Y_total.append(Y)
+        y_total.append(y)
+        x_total.append(x)
+
+    s_total = np.asarray(s_total)
+    Y_total = np.asarray(Y_total)
+    y_total = np.asarray(y_total)
+    x_total = np.asarray(x_total)
+
+    print('Finished generating training data')
+    return s_total, Y_total, y_total, x_total

@@ -1,42 +1,44 @@
 import numpy as np
 import pandas as pd
-from data_generation.generate_data import generate_training_data_antipodal
+from data_generation.generate_data import generate_training_data_antipodal_reconstruction
 from experiments.base_experiment import Experiment
-from models.unrolling_synchronization_antipodal import BuildModel, TrainModel, EvaluateModel, loss_z_over_2
+from models.unrolling_synchronization_antipodal_reconstruction_loss import BuildModel, TrainModel, EvaluateModel, loss_z_over_2, reconstruction_loss_z_over_2
 from synchronization.ppm import ppm_z_over_2
 from synchronization.pim import pim_z_over_2
 from synchronization.amp import amp_z_over_2
 import matplotlib.pyplot as plt
+import tensorflow as tf
 
 
 def task(N, R, Lambda, DEPTH, seed, epochs, L):
+    #todo: test with reconstruction_loss_z_over_2
     # Initialize random seed
     np.random.seed(seed)
-    x, Y = generate_training_data_antipodal(N,Lambda,R, L)
+    v, Y, y, x = generate_training_data_antipodal_reconstruction(N,Lambda,R, L)
 
-    model = BuildModel(N,Lambda,DEPTH)
+    model = BuildModel(L, N,Lambda,DEPTH)
     x_init = 1e-1*np.expand_dims(np.random.rand(R,N),axis=-1)
     x_init2 = 1e-1*np.expand_dims(np.random.rand(R,N),axis=-1)
-    x_val, Y_val  = generate_training_data_antipodal(N,Lambda,R, L)
+    v_val, Y_val, y_val, x_val  = generate_training_data_antipodal_reconstruction(N,Lambda,R, L)
     x_val_init = 1e-1 * np.expand_dims(np.random.rand(R, N), axis=-1)
     x_val_init2 = 1e-1 * np.expand_dims(np.random.rand(R, N), axis=-1)
-    TrainModel(model, Y, x, x_init,x_init2,Y_val, x_val, x_val_init,x_val_init2, epochs)
+    TrainModel(model, Y,y, x, x_init,x_init2,Y_val,y_val, x_val, x_val_init,x_val_init2, epochs)
 
     # Generate test data
-    x, Y = generate_training_data_antipodal(N,Lambda,R, L)
+    v, Y, y, x = generate_training_data_antipodal_reconstruction(N,Lambda,R, L)
     x_init = 1e-1*np.expand_dims(np.random.rand(R,N),axis=-1)
     x_init2 = 1e-1*np.expand_dims(np.random.rand(R,N),axis=-1)
-    x_est, loss_nn = EvaluateModel(model, Y, x, x_init, x_init2)
-
+    x_est, loss_nn = EvaluateModel(model, Y,y, x, x_init, x_init2)
 
     z_total = []
     for r in range(R):
-        z,num_iter = ppm_z_over_2(Y[r], x_init[r,:], max_iterations=DEPTH)
+        z, num_iter = ppm_z_over_2(Y[r], x_init[r,:], max_iterations=DEPTH)
         z_total.append(z)
     z1 = np.asarray(z_total)
-    print(x.shape)
-    print(z1.shape)
-    loss_ppm = loss_z_over_2(x.astype(np.float32), z1.astype(np.float32))
+    x_est = tf.reduce_mean(y * tf.repeat(tf.expand_dims(tf.squeeze(z1, axis=-1), axis=1), L, axis=1), axis=-1)
+    loss_ppm = reconstruction_loss_z_over_2(x.astype(np.float32), x_est)
+    # loss_ppm = loss_z_over_2(x.astype(np.float32), x_est)
+
     print('[PPM] loss = %f' % loss_ppm)
 
     z_total = []
@@ -44,7 +46,9 @@ def task(N, R, Lambda, DEPTH, seed, epochs, L):
         z, num_iter = pim_z_over_2(Y[r], x_init[r, :], max_iterations=DEPTH)
         z_total.append(z)
     z1 = np.asarray(z_total)
-    loss_pim = loss_z_over_2(x.astype(np.float32), z1.astype(np.float32))
+    x_est = tf.reduce_mean(y * tf.repeat(tf.expand_dims(tf.squeeze(z1, axis=-1), axis=1), L, axis=1), axis=-1)
+    loss_pim = reconstruction_loss_z_over_2(x.astype(np.float32), x_est)
+    # loss_pim = loss_z_over_2(x.astype(np.float32), x_est)
     print('[PIM] loss = %f' % loss_pim)
 
     z_total = []
@@ -52,12 +56,14 @@ def task(N, R, Lambda, DEPTH, seed, epochs, L):
         z, num_iter = amp_z_over_2(Y[r], x_init[r,:], x_init2[r,:], Lambda, max_iterations=DEPTH)
         z_total.append(z)
     z1 = np.asarray(z_total)
-    loss_amp = loss_z_over_2(x.astype(np.float32), z1.astype(np.float32))
+    x_est = tf.reduce_mean(y * tf.repeat(tf.expand_dims(tf.squeeze(z1, axis=-1), axis=1), L, axis=1), axis=-1)
+    loss_amp = reconstruction_loss_z_over_2(x.astype(np.float32), x_est)
+    # loss_amp = loss_z_over_2(x.astype(np.float32), x_est)
     print('[AMP] loss = %f' % loss_amp)
 
     return loss_ppm, loss_pim, loss_amp, loss_nn
 
-class CompareAntipodalUnrollingExperiment(Experiment):
+class CompareAntipodalUnrollingReconstructionLossExperiment(Experiment):
     def __init__(self, params: dict):
         super().__init__(params=params)
 
@@ -106,5 +112,5 @@ class CompareAntipodalUnrollingExperiment(Experiment):
 
 
 if __name__ == '__main__':
-    # CompareAntipodalUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1,3,5,9], 'epochs': 300, 'Lambda': 0.3, 'L': 21})
-    CompareAntipodalUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 5, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 0.3, 'L': 21})
+    # CompareAntipodalUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 0.4, 'L': 21})
+    CompareAntipodalUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 0.4, 'L': 21})
