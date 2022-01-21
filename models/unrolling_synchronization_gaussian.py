@@ -105,8 +105,9 @@ def EvaluateModel(model, Y, x, x_init, x_init2):
     x_est = model.predict([x_init.real,x_init.imag, x_init2.real, x_init2.imag, Y.real,Y.imag])
     x_est_norm = tf.math.sqrt(tf.reduce_sum(tf.math.pow(x_est, 2), axis=-1))
     x_est = x_est / np.expand_dims(x_est_norm, axis=-1)
-    # x = np.concatenate([x.real, x.imag], axis=-1)
-    loss = loss_u_1_complex(x, x_est)
+    x_est_r, x_est_i = tf.split(x_est, 2, axis=-1)
+    x_est_complex = x_est_r.numpy() + 1j * x_est_i.numpy()
+    loss = loss_u_1_complex(x.astype(np.csingle), x_est_complex.astype(np.csingle))
     print('[NN] loss = %lf' % loss)
     return x_est, loss
 
