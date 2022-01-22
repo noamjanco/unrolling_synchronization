@@ -124,4 +124,4 @@ def TrainModel(model, Y_r,Y_i, x_r,x_i, x_init_r,x_init_i, x_init2_r,x_init2_i,
               validation_data=([x_val_init_r,x_val_init_i,x_val_init2_r,x_val_init2_i, Y_val_r,Y_val_i], y_val),
               validation_freq=20,
               callbacks=[tensorboard_callback],
-              batch_size=10000)
+              batch_size=100)

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from data_generation.generate_data_1d_mra import generate_training_data_1d_mra
 from experiments.base_experiment import Experiment
-from models.unrolling_synchronization_gaussian import BuildModel, TrainModel, EvaluateModel, loss_u_1_complex
+from models.unrolling_synchronization_1d_mra import BuildModel, TrainModel, EvaluateModel, loss_u_1_complex
 from synchronization.ppm import ppm_u_1
 from synchronization.pim import pim_u_1
 from synchronization.amp import amp_u_1
@@ -109,4 +109,5 @@ class Compare1dMRAUnrollingExperiment(Experiment):
 
 
 if __name__ == '__main__':
-    Compare1dMRAUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 0.7, 'L': 21})
+    # Compare1dMRAUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 0.7, 'L': 21})
+    Compare1dMRAUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9], 'epochs': 300, 'Lambda': 0.7, 'L': 21})
