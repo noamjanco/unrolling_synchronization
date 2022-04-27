@@ -55,3 +55,65 @@ def align_in_fourier(y: np.ndarray, z: np.ndarray, L: int):
 
     x_est = tf.concat([y_a_r_mean, y_a_i_mean], axis=-1)
     return x_est
+
+
+def squared_correlation(X, X_hat) -> float:
+
+    N = len(X)
+    X_mat = np.zeros((N*3,3))
+    for i in range(N):
+        X_mat[3*i:3*i+3,:] = X[i]
+    X_hat_mat = np.zeros((N*3,3))
+    for i in range(N):
+        X_hat_mat[3*i:3*i+3,:] = X_hat[i]
+
+    return np.linalg.norm(X_mat.T @ X_hat_mat) / (N * np.sqrt(3))
+
+def rel_error_so3(X, X_hat) -> float:
+    return 1 - squared_correlation(X, X_hat)
+
+
+
+
+def project_to_orthogonal_matrix(M: np.array, flip=False):
+    """
+    Projects a 3x3 matrix to an orthogonal matrix.
+    This is done by computing USV^T = M
+    The orthogonal matrix UV^T is kept.
+    return det(UV^T) * UV^T
+    :param M: The matrix
+    :return: Returns the orthogonal matrix
+    """
+    u, s, vh = np.linalg.svd(M)
+    m_proj = u @ vh
+
+    if flip:
+        # todo: think if this necessary in PIM when projecting
+        m_proj = np.linalg.det(m_proj) * m_proj
+        assert np.isclose(np.linalg.det(m_proj),1)
+
+    return m_proj
+
+
+def initialize_matrix(N: int) -> np.ndarray:
+    z_list = [project_to_orthogonal_matrix(np.random.randn(3,3), flip=True) for _ in range(N)]
+    z = np.zeros((3*N, 3))
+    for i in range(N):
+        z[3*i:3*i+3,:] = z_list[i]
+    return z
+
+
+
+def project(M: np.ndarray) -> np.ndarray:
+    """
+    This function projects each 3x3 block of M into the space of orthogonal matrices
+    :param M: 3N x 3 Matrix
+    :return: a projected matrix, 3N X 3
+    """
+    N = int(M.shape[0] / 3)
+    M_proj = np.zeros_like(M)
+    M_proj_list = [project_to_orthogonal_matrix(M[3*i:3*i+3,:]) for i in range(N)]
+    for i in range(N):
+        M_proj[3*i:3*i+3,:] = M_proj_list[i]
+    return M_proj
+

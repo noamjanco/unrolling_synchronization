@@ -1,7 +1,8 @@
 import numpy as np
 import typing
 
-from common.math_utils import normalize, rel_error_u_1
+from common.math_utils import normalize, rel_error_u_1, initialize_matrix, project
+from typing import List
 
 
 def ppm_z_over_2(Y: np.array, v_init: np.array, max_iterations: int=1000, tol: float=1e-5) -> [np.array, int]:
@@ -42,3 +43,27 @@ def ppm_u_1(Y: np.array, v_init: np.array, max_iterations: int=1000, tol: float=
             break
         i += 1
     return v, i
+
+
+def ppm_so3(H: np.ndarray, num_iterations: int = 200, tol : float = 1e-3, z_init: np.ndarray = None) -> (List[np.ndarray], int):
+    # Extract N from the size of H
+    N = int(H.shape[0] / 3)
+
+    # Initialize the matrix z
+    if z_init is None:
+        z = initialize_matrix(N)
+    else:
+        z = z_init
+
+    for i in range(num_iterations):
+        z_tag = project(H @ z)
+        if np.linalg.norm(z_tag-z) < tol:
+            break
+        z = z_tag
+
+
+    #todo: avoid this step by changing the return of PIM method
+    z_tag_list = []
+    for i in range(N):
+        z_tag_list.append(z_tag[3*i:3*i+3,:])
+    return z_tag_list, i
