@@ -2,7 +2,7 @@ import numpy as np
 from typing import List
 
 
-from common.math_utils import rel_error_u_1, normalize, project_to_orthogonal_matrix
+from common.math_utils import rel_error_u_1, normalize, project_to_orthogonal_matrix, project
 
 
 def pim_z_over_2(Y: np.array, v_init: np.array, max_iterations: int=1000, tol: float=1e-5) -> [np.array, int]:
@@ -47,10 +47,7 @@ def pim_u_1(Y: np.array, v_init: np.array, max_iterations: int=1000, tol: float=
     return normalize(v), i
 
 
-def pim_so3(H: np.ndarray) -> List[np.ndarray]:
-    # Extract N from the size of H
-    N = int(H.shape[0] / 3)
-
+def pim_so3(H: np.ndarray) -> np.ndarray:
     # Compute the eigenvectors of H
     w, v = np.linalg.eig(H)
 
@@ -60,6 +57,6 @@ def pim_so3(H: np.ndarray) -> List[np.ndarray]:
     R_rec = v[:,sort_idx[-3:]]
 
     # Project onto the orthogonal matrices
-    R_rec_proj = [project_to_orthogonal_matrix(R_rec[3*i:3*i+3,:]) for i in range(N)]
+    R_rec_proj = project(R_rec)
 
     return R_rec_proj

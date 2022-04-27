@@ -81,4 +81,4 @@ class CompareSO3Experiment(Experiment):
 
 
 if __name__ == '__main__':
-    CompareSO3Experiment(params={'N': 100, 'R': 10, 'Lambda_range': np.arange(.4,3.,0.2), 'seed': 1, 'tol': 1e-3})
+    CompareSO3Experiment(params={'N': 100, 'R': 1, 'Lambda_range': np.arange(.4,3.,0.2), 'seed': 1, 'tol': 1e-3})

@@ -58,16 +58,8 @@ def align_in_fourier(y: np.ndarray, z: np.ndarray, L: int):
 
 
 def squared_correlation(X, X_hat) -> float:
-
-    N = len(X)
-    X_mat = np.zeros((N*3,3))
-    for i in range(N):
-        X_mat[3*i:3*i+3,:] = X[i]
-    X_hat_mat = np.zeros((N*3,3))
-    for i in range(N):
-        X_hat_mat[3*i:3*i+3,:] = X_hat[i]
-
-    return np.linalg.norm(X_mat.T @ X_hat_mat) / (N * np.sqrt(3))
+    N = X.shape[0]/3
+    return np.linalg.norm(X.T @ X_hat) / (N * np.sqrt(3))
 
 def rel_error_so3(X, X_hat) -> float:
     return 1 - squared_correlation(X, X_hat)
@@ -117,3 +109,18 @@ def project(M: np.ndarray) -> np.ndarray:
         M_proj[3*i:3*i+3,:] = M_proj_list[i]
     return M_proj
 
+
+def project_batch(M: np.ndarray) -> np.ndarray:
+    """
+    This function projects each 3x3 block of M into the space of orthogonal matrices
+    :param M: 3N x 3 Matrix
+    :return: a projected matrix, 3N X 3
+    """
+    BatchSize = M.shape[0]
+    N = int(M.shape[1] / 3)
+    M_proj = np.zeros_like(M)
+    for k in range(BatchSize):
+        M_proj_list = [project_to_orthogonal_matrix(M[k,3*i:3*i+3,:]) for i in range(N)]
+        for i in range(N):
+            M_proj[k,3*i:3*i+3,:] = M_proj_list[i]
+    return M_proj

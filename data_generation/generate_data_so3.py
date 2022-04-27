@@ -26,8 +26,27 @@ def generate_data_so3(N: int, Lambda: float) -> [List[np.ndarray], np.ndarray]:
     H = Lambda / N * R_mat @ R_mat.T + 1/np.sqrt(3 * N) * W
 
     # print('Generated %d rotation matrices' % N)
-    return R, H
+    return R_mat, H
 
+
+def generate_training_data_so3(N: int, Lambda: float, R: int) -> [np.ndarray, np.ndarray]:
+    Rot_total = []
+    H_total = []
+    for r in range(R):
+        Rot_mat, H  = generate_data_so3(N, Lambda)
+
+        # #todo: Return Rot_mat inside generate data so3
+        # Rot_mat = np.zeros((3 * N, 3))
+        # for i in range(N):
+        #     Rot_mat[3 * i:3 * i + 3, :] = Rot[i]
+
+        Rot_total.append(Rot_mat)
+        H_total.append(H)
+
+    Rot_total = np.asarray(Rot_total)
+    H_total = np.asarray(H_total)
+
+    return Rot_total, H_total
 
 if __name__ == '__main__':
     print('Main script')

@@ -61,9 +61,4 @@ def ppm_so3(H: np.ndarray, num_iterations: int = 200, tol : float = 1e-3, z_init
             break
         z = z_tag
 
-
-    #todo: avoid this step by changing the return of PIM method
-    z_tag_list = []
-    for i in range(N):
-        z_tag_list.append(z_tag[3*i:3*i+3,:])
-    return z_tag_list, i
+    return z_tag, i
