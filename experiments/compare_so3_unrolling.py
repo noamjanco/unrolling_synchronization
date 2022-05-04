@@ -37,7 +37,7 @@ def task(N, R, Lambda, DEPTH, seed, epochs):
         z,num_iter = ppm_so3(Y[r], z_init=s_init[r,:], num_iterations=DEPTH)
         z_total.append(z)
     z1 = np.asarray(z_total)
-    loss_ppm = loss_so3(s, z1)
+    loss_ppm = loss_so3(s.astype(np.float32), z1.astype(np.float32))
     print('[PPM] loss = %f' % loss_ppm)
 
     z_total = []
@@ -45,7 +45,7 @@ def task(N, R, Lambda, DEPTH, seed, epochs):
         z = pim_so3(Y[r])
         z_total.append(z)
     z1 = np.asarray(z_total)
-    loss_pim = loss_so3(s, z1)
+    loss_pim = loss_so3(s.astype(np.float32), z1.astype(np.float32))
     print('[PIM] loss = %f' % loss_pim)
 
 
@@ -66,18 +66,21 @@ class CompareSO3UnrollingExperiment(Experiment):
         df = pd.DataFrame()
         for d in depth_range:
             for t in range(num_trials):
-                loss_ppm, loss_pim, loss_amp, loss_nn = task(N=N, R=R, Lambda=Lambda, DEPTH=d, seed=t, epochs=epochs)
-                df = df.append({'loss_ppm': loss_ppm,
-                                'loss_pim': loss_pim,
-                                'loss_amp': loss_amp,
-                                'loss_nn': loss_nn,
-                                'DEPTH': d,
-                                'trial': t,
-                                'Lambda': Lambda,
-                                'R': R,
-                                'N': N,
-                                'L': L,
-                                'epochs': epochs}, ignore_index=True)
+                try:
+                    print('running N=',N,'R=',R,'Lambda=',Lambda,'Depth= ',d)
+                    loss_ppm, loss_pim, loss_amp, loss_nn = task(N=N, R=R, Lambda=Lambda, DEPTH=d, seed=t, epochs=epochs)
+                    df = df.append({'loss_ppm': loss_ppm,
+                                    'loss_pim': loss_pim,
+                                    'loss_amp': loss_amp,
+                                    'loss_nn': loss_nn,
+                                    'DEPTH': d,
+                                    'trial': t,
+                                    'Lambda': Lambda,
+                                    'R': R,
+                                    'N': N,
+                                    'epochs': epochs}, ignore_index=True)
+                except Exception as e:
+                    print(e)
         self.results = df
 
     def plot_results(self):
@@ -100,5 +103,6 @@ class CompareSO3UnrollingExperiment(Experiment):
 
 
 if __name__ == '__main__':
-    CompareSO3UnrollingExperiment(params={'N': 20, 'R': 10, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 2, 'Lambda': 1.2, 'L': 10})
+    # CompareSO3UnrollingExperiment(params={'N': 20, 'R': 1000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 200, 'Lambda': 1.2})
+    CompareSO3UnrollingExperiment(params={'N': 20, 'R': 1000, 'num_trials': 1, 'depth_range': [1,3,5,9,15,20,50], 'epochs': 200, 'Lambda': 1.2})
     # CompareGaussianUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 1.5, 'L': 10})
