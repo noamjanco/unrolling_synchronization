@@ -36,9 +36,10 @@ class ProjectionBlock(keras.layers.Layer):
         for i in range(self.hidden_layers):
             y = self.dense_layers[i](y)
             y = self.bns[i](y)
-            # y = keras.activations.relu(y)
+            y = keras.activations.relu(y)
             # y = keras.layers.LeakyReLU()(y)
-            y = keras.activations.tanh(y)
+            # y = keras.layers.Dropout(0.1)(y)
+            # y = keras.activations.tanh(y)
             # if i > 0:
             #     y = y + y_prev
             y_prev = y
@@ -52,7 +53,7 @@ class ProjectionBlock(keras.layers.Layer):
 
         y = tf.reshape(y, tf.shape(x))
 
-        y = y + x
+        # y = y + x
 
         return y
 
@@ -82,7 +83,14 @@ class SynchronizationBlock(keras.layers.Layer):
         self.N = N
         # self.project_block = ProjectionBlock(hidden_size=32, hidden_layers=3)
         # self.project_block = ProjectionBlock(hidden_size=16, hidden_layers=3)
-        self.project_block = ProjectionBlock(hidden_size=16, hidden_layers=1)
+        # self.project_block = ProjectionBlock(hidden_size=16, hidden_layers=1) # prev results
+        # self.project_block = ProjectionBlock(hidden_size=16, hidden_layers=3) # last
+        # self.project_block = ProjectionBlock(hidden_size=16, hidden_layers=1) # last
+        # self.project_block = ProjectionBlock(hidden_size=16, hidden_layers=1) # last
+        # self.project_block = ProjectionBlock(hidden_size=3, hidden_layers=1) # last
+        self.project_block = ProjectionBlock(hidden_size=32, hidden_layers=1) # last best
+        # self.project_block = ProjectionBlock(hidden_size=81, hidden_layers=1) # last
+        # self.project_block = ProjectionBlock(hidden_size=32, hidden_layers=3)
         # self.project_block = ProjectionBlock(hidden_size=16, hidden_layers=3)
         # self.project_block = ProjectionBlock(hidden_size=128, hidden_layers=3)
         # self.project_block = ProjectionBlock(hidden_size=32, hidden_layers=5)
