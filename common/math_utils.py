@@ -103,25 +103,25 @@ def project(M: np.ndarray) -> np.ndarray:
     :return: a projected matrix, 3N X 3
     """
     N = int(M.shape[0] / 3)
-    # M_proj = np.zeros_like(M)
-    # M_proj_list = [project_to_orthogonal_matrix(M[3*i:3*i+3,:]) for i in range(N)]
-    # for i in range(N):
-    #     M_proj[3*i:3*i+3,:] = M_proj_list[i]
-    # return M_proj
+    M_proj = np.zeros_like(M)
+    M_proj_list = [project_to_orthogonal_matrix(M[3*i:3*i+3,:]) for i in range(N)]
+    for i in range(N):
+        M_proj[3*i:3*i+3,:] = M_proj_list[i]
+    return M_proj
 
-    M_reshaped = tf.reshape(M, [N, 3, 3])
-    norm = tf.sqrt(tf.reduce_sum(tf.pow(M_reshaped,2),axis=[1,2],keepdims=True))
-    M_reshaped = M_reshaped / norm
-
-    Q = M_reshaped
-    for i in range(10):
-        N = tf.matmul(tf.transpose(Q,perm=[0,2,1]), Q)
-        P = 1 / 2 * tf.matmul(Q, N)
-        Q = 2 * Q + tf.matmul(P, N) - 3 * P
-
-    Q_reshaped = tf.reshape(Q, tf.shape(M)).numpy()
-
-    return Q_reshaped
+    # M_reshaped = tf.reshape(M, [N, 3, 3])
+    # norm = tf.sqrt(tf.reduce_sum(tf.pow(M_reshaped,2),axis=[1,2],keepdims=True))
+    # M_reshaped = M_reshaped / norm
+    #
+    # Q = M_reshaped
+    # for i in range(10):
+    #     N = tf.matmul(tf.transpose(Q,perm=[0,2,1]), Q)
+    #     P = 1 / 2 * tf.matmul(Q, N)
+    #     Q = 2 * Q + tf.matmul(P, N) - 3 * P
+    #
+    # Q_reshaped = tf.reshape(Q, tf.shape(M)).numpy()
+    #
+    # return Q_reshaped
 
 def project_batch(M: np.ndarray) -> np.ndarray:
     """

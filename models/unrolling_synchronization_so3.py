@@ -89,6 +89,7 @@ class SynchronizationBlock(keras.layers.Layer):
         # self.project_block = ProjectionBlock(hidden_size=16, hidden_layers=1) # last
         # self.project_block = ProjectionBlock(hidden_size=3, hidden_layers=1) # last
         self.project_block = ProjectionBlock(hidden_size=32, hidden_layers=1) # last best
+        self.project_block2 = ProjectionBlock(hidden_size=9, hidden_layers=1) # last best
         # self.project_block = ProjectionBlock(hidden_size=81, hidden_layers=1) # last
         # self.project_block = ProjectionBlock(hidden_size=32, hidden_layers=3)
         # self.project_block = ProjectionBlock(hidden_size=16, hidden_layers=3)
@@ -99,6 +100,7 @@ class SynchronizationBlock(keras.layers.Layer):
     def call(self, Y, x, x_prev):
         x1 = tf.matmul(Y, x)
         x1 = self.project_block(x1)
+        x1 = x1 + self.project_block2(x_prev)
         #todo: use x_prev
         return x1
 
