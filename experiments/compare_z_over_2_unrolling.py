@@ -104,4 +104,4 @@ class CompareZOver2UnrollingExperiment(Experiment):
 
 
 if __name__ == '__main__':
-    CompareZOver2UnrollingExperiment(params={'N': 20, 'R': 20000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 1.25})
+    CompareZOver2UnrollingExperiment(params={'N': 20, 'R': 20000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 2})
