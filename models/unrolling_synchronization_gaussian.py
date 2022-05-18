@@ -15,17 +15,53 @@ class NonLinearActivation(keras.layers.Layer):
 
     def call(self, x):
         y = self.dense_1(x) + self.dense_3(tf.math.pow(x,3)) + self.dense_5(tf.math.pow(x,5))
-        y = tf.math.minimum(y, tf.ones_like(y))
-        y = tf.math.maximum(y, -tf.ones_like(y))
+        # y = tf.math.minimum(y, tf.ones_like(y))
+        # y = tf.math.maximum(y, -tf.ones_like(y))
+        y = keras.activations.tanh(y)
         return y
 
+
+
+class NewNonLinearActivation(keras.layers.Layer):
+    def __init__(self, hidden_size=32, hidden_layers=1):
+        super(NewNonLinearActivation, self).__init__()
+        self.hidden_size = hidden_size
+        self.hidden_layers = hidden_layers
+        self.dense_layers = [Dense(self.hidden_size) for _ in range(self.hidden_layers)]
+        self.bns = [keras.layers.BatchNormalization() for _ in range(self.hidden_layers)]
+        self.leaky_relus = [tf.keras.layers.LeakyReLU() for _ in range(self.hidden_layers)]
+        self.output_layer = Dense(1)
+        self.output_bn = keras.layers.BatchNormalization()
+
+
+    def call(self, x):
+        y = x
+
+        for i in range(self.hidden_layers):
+            y = self.dense_layers[i](y)
+            # y = self.bns[i](y)
+            y = keras.activations.relu(y)
+            # y = self.leaky_relus[i](y)
+            # y = keras.activations.tanh(y)
+
+        y = self.output_layer(y)
+        # y = self.output_bn(y)
+        y = keras.activations.tanh(y)
+
+        return y
 
 class SynchronizationBlock(keras.layers.Layer):
     def __init__(self, Lambda,N):
         super(SynchronizationBlock, self).__init__()
         self.dense_3 = Dense(1,kernel_initializer=tf.keras.initializers.ones())
         self.Lambda = Lambda
-        self.nonlinear = NonLinearActivation()
+        # self.nonlinear = NonLinearActivation()
+        # self.nonlinear = NewNonLinearActivation(hidden_size=32,hidden_layers=1)
+        # self.nonlinear = NewNonLinearActivation(hidden_size=128,hidden_layers=1)
+        # self.nonlinear = NewNonLinearActivation(hidden_size=16,hidden_layers=3)
+        self.nonlinear = NewNonLinearActivation(hidden_size=256,hidden_layers=1)
+        # self.nonlinear = NewNonLinearActivation(hidden_size=32,hidden_layers=1)
+
 
 
     def call(self, Y_r, Y_i, x_r, x_i, x_prev_r, x_prev_i):
@@ -94,7 +130,8 @@ def BuildModel(N,Lambda,DEPTH):
     x_i = tf.math.divide(x_i, x_abs)
     output = tf.concat([x_r, x_i], axis=-1)
     model = Model(inputs=[v_in_r,v_in_i,v_in2_r,v_in2_i, Y_r,Y_i], outputs=output)
-    opt = keras.optimizers.Adam(learning_rate=0.0005)
+    opt = keras.optimizers.Adam(learning_rate=0.0001)
+    # opt = keras.optimizers.Adam(learning_rate=0.1)
 
     model.compile(optimizer=opt, loss=loss_u_1)
     model.summary()
@@ -124,4 +161,4 @@ def TrainModel(model, Y_r,Y_i, x_r,x_i, x_init_r,x_init_i, x_init2_r,x_init2_i,
               validation_data=([x_val_init_r,x_val_init_i,x_val_init2_r,x_val_init2_i, Y_val_r,Y_val_i], y_val),
               validation_freq=20,
               callbacks=[tensorboard_callback],
-              batch_size=10000)
+              batch_size=128)

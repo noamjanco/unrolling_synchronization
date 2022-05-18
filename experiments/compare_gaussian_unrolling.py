@@ -109,5 +109,7 @@ class CompareGaussianUnrollingExperiment(Experiment):
 
 
 if __name__ == '__main__':
-    CompareGaussianUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 1.2, 'L': 10})
+    # CompareGaussianUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 1.2, 'L': 10})
+    # CompareGaussianUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [9], 'epochs': 300, 'Lambda': 1.2, 'L': 10})
+    CompareGaussianUnrollingExperiment(params={'N': 20, 'R': 20000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20], 'epochs': 300, 'Lambda': 1.5, 'L': 100})
     # CompareGaussianUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 1.5, 'L': 10})
