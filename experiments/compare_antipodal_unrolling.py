@@ -72,18 +72,21 @@ class CompareAntipodalUnrollingExperiment(Experiment):
         df = pd.DataFrame()
         for d in depth_range:
             for t in range(num_trials):
-                loss_ppm, loss_pim, loss_amp, loss_nn = task(N=N, R=R, Lambda=Lambda, DEPTH=d, seed=t, epochs=epochs, L=L)
-                df = df.append({'loss_ppm': loss_ppm,
-                                'loss_pim': loss_pim,
-                                'loss_amp': loss_amp,
-                                'loss_nn': loss_nn,
-                                'DEPTH': d,
-                                'trial': t,
-                                'Lambda': Lambda,
-                                'R': R,
-                                'N': N,
-                                'L': L,
-                                'epochs': epochs}, ignore_index=True)
+                try:
+                    loss_ppm, loss_pim, loss_amp, loss_nn = task(N=N, R=R, Lambda=Lambda, DEPTH=d, seed=t, epochs=epochs, L=L)
+                    df = df.append({'loss_ppm': loss_ppm,
+                                    'loss_pim': loss_pim,
+                                    'loss_amp': loss_amp,
+                                    'loss_nn': loss_nn,
+                                    'DEPTH': d,
+                                    'trial': t,
+                                    'Lambda': Lambda,
+                                    'R': R,
+                                    'N': N,
+                                    'L': L,
+                                    'epochs': epochs}, ignore_index=True)
+                except Exception as e:
+                    print('task failed')
         self.results = df
 
     def plot_results(self):
@@ -107,4 +110,7 @@ class CompareAntipodalUnrollingExperiment(Experiment):
 
 if __name__ == '__main__':
     # CompareAntipodalUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1,3,5,9], 'epochs': 300, 'Lambda': 0.3, 'L': 21})
-    CompareAntipodalUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 5, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 0.3, 'L': 21})
+    # CompareAntipodalUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 0.3, 'L': 21})
+    CompareAntipodalUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 0.6, 'L': 21})
+    # CompareAntipodalUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [9], 'epochs': 300, 'Lambda': 0.3, 'L': 21})
+    # CompareAntipodalUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 5, 'depth_range': [9], 'epochs': 300, 'Lambda': 0.3, 'L': 21})

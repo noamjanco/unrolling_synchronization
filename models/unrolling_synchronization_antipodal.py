@@ -20,20 +20,55 @@ class NonLinearActivation(keras.layers.Layer):
         return y
 
 
+
+
+class NewNonLinearActivation(keras.layers.Layer):
+    def __init__(self, hidden_size=32, hidden_layers=1):
+        super(NewNonLinearActivation, self).__init__()
+        self.hidden_size = hidden_size
+        self.hidden_layers = hidden_layers
+        self.dense_layers = [Dense(self.hidden_size) for _ in range(self.hidden_layers)]
+        self.bns = [keras.layers.BatchNormalization() for _ in range(self.hidden_layers)]
+        self.leaky_relus = [tf.keras.layers.LeakyReLU() for _ in range(self.hidden_layers)]
+        self.output_layer = Dense(1)
+        self.output_bn = keras.layers.BatchNormalization()
+
+
+    def call(self, x):
+        y = x
+
+        for i in range(self.hidden_layers):
+            y = self.dense_layers[i](y)
+            # y = self.bns[i](y)
+            y = keras.activations.relu(y)
+            # y = self.leaky_relus[i](y)
+            # y = keras.activations.tanh(y)
+
+        y = self.output_layer(y)
+        # y = self.output_bn(y)
+        y = keras.activations.tanh(y)
+
+        return y
+
 class SynchronizationBlock(keras.layers.Layer):
     def __init__(self, Lambda, N):
         super(SynchronizationBlock, self).__init__()
         self.dense_1 = Dense(1,kernel_initializer=tf.keras.initializers.ones())
+        # self.dense_1 = Dense(1)
         self.Lambda = Lambda
         self.N = N
-        self.nonlinear = NonLinearActivation()
+        # self.nonlinear = NonLinearActivation()
+        self.nonlinear = NewNonLinearActivation(hidden_size=32,hidden_layers=1)
+        # self.nonlinear2 = NonLinearActivation2()
+        self.nonlinear2 = NewNonLinearActivation(hidden_size=32,hidden_layers=1)
+        self.bn = keras.layers.BatchNormalization()
 
     def call(self, Y, x, x_prev, x_prev_prev):
         x1 = self.Lambda * tf.matmul(Y, x)
-        # x1 = self.dense_1(x1)
-        # x2 = - self.Lambda ** 2 * tf.math.multiply(tf.expand_dims(1 - tf.reduce_mean(tf.pow(self.nonlinear2(x),2),axis=1),axis=-1), x_prev)
-        x2 = - self.Lambda ** 2 * tf.math.multiply(tf.expand_dims(1 - tf.reduce_mean(tf.pow(x, 2), axis=1), axis=-1),x_prev)
+        x1 = self.dense_1(x1)
+        x2 = - self.Lambda ** 2 * tf.math.multiply(tf.expand_dims(1 - tf.reduce_mean(tf.pow(self.nonlinear2(x),2),axis=1),axis=-1), x_prev)
         x_new = x1 + x2
+        x_new = self.bn(x_new)
         x_new = self.nonlinear(x_new)
 
         return x_new
@@ -62,7 +97,7 @@ def BuildModel(N,Lambda,DEPTH):
 
 
     model = Model(inputs=[v_in,v_in2, Y], outputs=v_new)
-    opt = keras.optimizers.Adam(learning_rate=0.001) # working 18:07
+    opt = keras.optimizers.Adam(learning_rate=0.0001) # working 18:07
     model.compile(optimizer=opt, loss=loss_z_over_2)
     model.summary()
     return model
@@ -85,4 +120,4 @@ def TrainModel(model, Y, x, x_init, x_init2, Y_val,x_val,x_val_init,x_val_init2,
               validation_data=([x_val_init,x_val_init2, Y_val], x_val.astype(np.float32)),
               validation_freq=20,
               callbacks=[tensorboard_callback],
-              batch_size=500)
+              batch_size=128)
