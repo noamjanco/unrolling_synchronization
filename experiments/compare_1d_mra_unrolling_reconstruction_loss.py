@@ -19,7 +19,8 @@ def task(N, R, Lambda, DEPTH, seed, epochs, L):
 
     models = []
     training_loss = []
-    for t in range(5):
+    # for t in range(5):
+    for t in range(1):
         model = BuildModel(L, N, Lambda, DEPTH)
         x_init = 1e-2 * (np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
         x_init2 = 1e-2 * (
@@ -141,4 +142,6 @@ class Compare1dMRAUnrollingReconstructionLossExperiment(Experiment):
 
 
 if __name__ == '__main__':
-    Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 1000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15], 'epochs': 500, 'Lambda': 1, 'L': 21})
+    # Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 1000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15], 'epochs': 500, 'Lambda': 1, 'L': 21})
+    # Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [5], 'epochs': 500, 'Lambda': 1, 'L': 21})
+    Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [5], 'epochs': 200, 'Lambda': 1, 'L': 21})
