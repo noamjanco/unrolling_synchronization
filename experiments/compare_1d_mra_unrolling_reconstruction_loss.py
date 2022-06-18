@@ -20,7 +20,7 @@ def task(N, R, Lambda, DEPTH, seed, epochs, L):
     models = []
     training_loss = []
     # for t in range(5):
-    for t in range(1):
+    for t in range(2):
         model = BuildModel(L, N, Lambda, DEPTH)
         x_init = 1e-2 * (np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
         x_init2 = 1e-2 * (
@@ -108,18 +108,21 @@ class Compare1dMRAUnrollingReconstructionLossExperiment(Experiment):
         df = pd.DataFrame()
         for d in depth_range:
             for t in range(num_trials):
-                loss_ppm, loss_pim, loss_amp, loss_nn = task(N=N, R=R, Lambda=Lambda, DEPTH=d, seed=t, epochs=epochs, L=L)
-                df = df.append({'loss_ppm': loss_ppm,
-                                'loss_pim': loss_pim,
-                                'loss_amp': loss_amp,
-                                'loss_nn': loss_nn,
-                                'DEPTH': d,
-                                'trial': t,
-                                'Lambda': Lambda,
-                                'R': R,
-                                'N': N,
-                                'L': L,
-                                'epochs': epochs}, ignore_index=True)
+                try:
+                    loss_ppm, loss_pim, loss_amp, loss_nn = task(N=N, R=R, Lambda=Lambda, DEPTH=d, seed=t, epochs=epochs, L=L)
+                    df = df.append({'loss_ppm': loss_ppm,
+                                    'loss_pim': loss_pim,
+                                    'loss_amp': loss_amp,
+                                    'loss_nn': loss_nn,
+                                    'DEPTH': d,
+                                    'trial': t,
+                                    'Lambda': Lambda,
+                                    'R': R,
+                                    'N': N,
+                                    'L': L,
+                                    'epochs': epochs}, ignore_index=True)
+                except:
+                    print('Error')
         self.results = df
 
     def plot_results(self):
@@ -144,4 +147,5 @@ class Compare1dMRAUnrollingReconstructionLossExperiment(Experiment):
 if __name__ == '__main__':
     # Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 1000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15], 'epochs': 500, 'Lambda': 1, 'L': 21})
     # Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [5], 'epochs': 500, 'Lambda': 1, 'L': 21})
-    Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [5], 'epochs': 200, 'Lambda': 1, 'L': 21})
+    Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20], 'epochs': 200, 'Lambda': 1, 'L': 21})
+    # Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 1000, 'num_trials': 1, 'depth_range': [5], 'epochs': 2, 'Lambda': 1, 'L': 21})

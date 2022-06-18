@@ -4,6 +4,7 @@ from keras.layers import Dense
 from keras import Model
 import datetime
 import numpy as np
+import os
 
 
 class NonLinearActivation(keras.layers.Layer):
@@ -157,8 +158,8 @@ def BuildModel(L, N, Lambda, DEPTH):
     x_est = tf.concat([y_a_r_mean, y_a_i_mean], axis=-1)
 
     model = Model(inputs=[v_in_r, v_in_i, v_in2_r, v_in2_i, Y_r, Y_i, y_r, y_i], outputs=x_est)
-    # opt = keras.optimizers.Adam(learning_rate=0.001)
     opt = keras.optimizers.Adam(learning_rate=0.001)
+    # opt = keras.optimizers.Adam(learning_rate=0.0005)
 
     model.compile(optimizer=opt, loss=reconstruction_loss_u_1)
     model.summary()
@@ -180,6 +181,13 @@ def TrainModel(model, Y_r,Y_i,y,x, x_init_r,x_init_i, x_init2_r,x_init2_i,
                                                           write_images=True, profile_batch=0)
 
     # earlystopping_callback = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, verbose=True)
+    checkpoint_filepath = 'tmp/checkpoint'
+    model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=checkpoint_filepath,
+        save_weights_only=True,
+        monitor='loss',
+        mode='min',
+        save_best_only=True)
 
     # y = tf.concat([x_r, x_i], axis=-1)
     # y_val = tf.concat([x_val_r, x_val_i], axis=-1)
@@ -189,7 +197,10 @@ def TrainModel(model, Y_r,Y_i,y,x, x_init_r,x_init_i, x_init2_r,x_init2_i,
               # validation_data=([x_val_init_r,x_val_init_i,x_val_init2_r,x_val_init2_i, Y_val_r,Y_val_i,y_val], x_val),
               # callbacks=[tensorboard_callback, earlystopping_callback],
               validation_freq=20,
-              callbacks=[tensorboard_callback],
+              callbacks=[tensorboard_callback, model_checkpoint_callback],
               # batch_size=128)
               batch_size=128)
               # batch_size=512)
+
+    # The model weights (that are considered the best) are loaded into the model.
+    model.load_weights(checkpoint_filepath)
