@@ -124,10 +124,22 @@ def TrainModel(model, Y, x, x_init, x_init2, Y_val,x_val,x_val_init,x_val_init2,
     log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1, write_graph=True,
                                                           write_images=True, profile_batch=0)
+
+    checkpoint_filepath = 'tmp/checkpoint'
+    model_checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=checkpoint_filepath,
+        save_weights_only=True,
+        monitor='loss',
+        mode='min',
+        save_best_only=True)
+
     model.fit(x=[x_init,x_init2, Y],
               y=x.astype(np.float32),
               epochs=epochs,
               validation_data=([x_val_init,x_val_init2, Y_val], x_val.astype(np.float32)),
               validation_freq=20,
-              callbacks=[tensorboard_callback],
+              callbacks=[tensorboard_callback, model_checkpoint_callback],
               batch_size=128)
+
+    # The model weights (that are considered the best) are loaded into the model.
+    model.load_weights(checkpoint_filepath)
