@@ -12,17 +12,21 @@ def generate_data_so3(N: int, Lambda: float) -> [List[np.ndarray], np.ndarray]:
 
     H = np.zeros((3*N, 3*N))
     R = [project_to_orthogonal_matrix(np.random.randn(3,3), flip=True) for _ in range(N)]
+    # W = [project_to_orthogonal_matrix(np.random.randn(3,3), flip=True) for _ in range(N)]
 
     # for i in range(N):
     #     for j in range(N):
     #         H[3*i:3*i+3,3*j:3*j+3] = R[i] @ R[j].T
 
     R_mat = np.zeros((3*N, 3))
+    # W_mat = np.zeros((3*N, 3))
     for i in range(N):
         R_mat[3*i:3*i+3,:] = R[i]
+        # W_mat[3*i:3*i+3,:] = W[i]
     # todo: generate W according to Gaussian Orthogonal Ensemble
     a = np.random.randn(3*N, 3*N)
     W = np.tril(a) + np.tril(a, -1).T
+    # W = W_mat @ W_mat.T
     H = Lambda / N * R_mat @ R_mat.T + 1/np.sqrt(3 * N) * W
 
     # print('Generated %d rotation matrices' % N)
