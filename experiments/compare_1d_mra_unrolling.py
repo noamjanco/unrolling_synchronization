@@ -14,18 +14,33 @@ def task(N, R, Lambda, DEPTH, seed, epochs, L):
     np.random.seed(seed)
     s, Y, x, _, _ = generate_training_data_1d_mra(N, Lambda, R, L)
 
-    model = BuildModel(N, Lambda, DEPTH)
-    x_init = 1e-2 * (np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
-    x_init2 = 1e-2 * (
-    np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
-    s_val, Y_val, x_val, _, _ = generate_training_data_1d_mra(N, Lambda, R, L)
-    x_val_init = 1e-2 * (
-    np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
-    x_val_init2 = 1e-2 * (
-    np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
-    TrainModel(model, Y.real, Y.imag, x.real, x.imag, x_init.real, x_init.imag,
-               x_init2.real, x_init2.imag, Y_val.real, Y_val.imag, x_val.real, x_val.imag,
-               x_val_init.real, x_val_init.imag, x_val_init2.real, x_val_init2.imag, epochs)
+    training_loss = []
+    models = []
+    # for t in range(5):
+    for t in range(10):
+        model = BuildModel(N, Lambda, DEPTH)
+        x_init = 1e-2 * (np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
+        x_init2 = 1e-2 * (
+        np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
+        s_val, Y_val, x_val, _, _ = generate_training_data_1d_mra(N, Lambda, R, L)
+        x_val_init = 1e-2 * (
+        np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
+        x_val_init2 = 1e-2 * (
+        np.expand_dims(np.random.rand(R, N), axis=-1) + 1j * np.expand_dims(np.random.rand(R, N), axis=-1))
+        TrainModel(model, Y.real, Y.imag, x.real, x.imag, x_init.real, x_init.imag,
+                   x_init2.real, x_init2.imag, Y_val.real, Y_val.imag, x_val.real, x_val.imag,
+                   x_val_init.real, x_val_init.imag, x_val_init2.real, x_val_init2.imag, epochs)
+        models.append(model)
+        x_est, loss_nn = EvaluateModel(model, Y_val, x_val, x_val_init, x_val_init2)
+        training_loss.append(loss_nn)
+
+    # choose model with minimal loss
+    print('@@')
+    print('models loss:')
+    print(training_loss)
+    print('chosen model: %d' % (np.argmin(training_loss)))
+
+    model = models[np.argmin(training_loss)]
 
     # Generate test data
     s, Y, x, _, _ = generate_training_data_1d_mra(N, Lambda, R, L)
@@ -75,18 +90,21 @@ class Compare1dMRAUnrollingExperiment(Experiment):
         df = pd.DataFrame()
         for d in depth_range:
             for t in range(num_trials):
-                loss_ppm, loss_pim, loss_amp, loss_nn = task(N=N, R=R, Lambda=Lambda, DEPTH=d, seed=t, epochs=epochs, L=L)
-                df = df.append({'loss_ppm': loss_ppm,
-                                'loss_pim': loss_pim,
-                                'loss_amp': loss_amp,
-                                'loss_nn': loss_nn,
-                                'DEPTH': d,
-                                'trial': t,
-                                'Lambda': Lambda,
-                                'R': R,
-                                'N': N,
-                                'L': L,
-                                'epochs': epochs}, ignore_index=True)
+                try:
+                    loss_ppm, loss_pim, loss_amp, loss_nn = task(N=N, R=R, Lambda=Lambda, DEPTH=d, seed=t, epochs=epochs, L=L)
+                    df = df.append({'loss_ppm': loss_ppm,
+                                    'loss_pim': loss_pim,
+                                    'loss_amp': loss_amp,
+                                    'loss_nn': loss_nn,
+                                    'DEPTH': d,
+                                    'trial': t,
+                                    'Lambda': Lambda,
+                                    'R': R,
+                                    'N': N,
+                                    'L': L,
+                                    'epochs': epochs}, ignore_index=True)
+                except:
+                    print('error')
         self.results = df
 
     def plot_results(self):
@@ -110,4 +128,6 @@ class Compare1dMRAUnrollingExperiment(Experiment):
 
 if __name__ == '__main__':
     # Compare1dMRAUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 0.7, 'L': 21})
-    Compare1dMRAUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9], 'epochs': 300, 'Lambda': 0.7, 'L': 21})
+    # Compare1dMRAUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20], 'epochs': 300, 'Lambda': 0.7, 'L': 21})
+    # Compare1dMRAUnrollingExperiment(params={'N': 20, 'R': 20000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20], 'epochs': 20, 'Lambda': 0.7, 'L': 21})
+    Compare1dMRAUnrollingExperiment(params={'N': 20, 'R': 20000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20], 'epochs': 100, 'Lambda': 0.7, 'L': 21})
