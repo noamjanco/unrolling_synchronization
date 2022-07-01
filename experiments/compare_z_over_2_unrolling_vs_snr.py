@@ -108,7 +108,7 @@ class CompareZOver2UnrollingVsSNRExperiment(Experiment):
         plt.plot(Lambda_range, avg_loss_amp_vs_d)
         plt.plot(Lambda_range, avg_loss_nn_vs_d)
         plt.legend(['PPM', 'PIM', 'AMP', 'NN'])
-        plt.xlabel('SNR')
+        plt.xlabel(r'$\lambda$')
         plt.ylabel('Mean Error')
         plt.savefig(self.get_results_path()+'.eps')
         plt.savefig(self.get_results_path()+'.png')
