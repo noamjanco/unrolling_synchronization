@@ -3,7 +3,8 @@ from data_generation.generate_data_so3 import generate_data_so3
 from synchronization.pim import pim_so3
 import numpy as np
 import tqdm
-
+import time
+import matplotlib.pyplot as plt
 
 def j_conj_err(Rot_est: np.ndarray, Rot: np.ndarray):
     J = np.diag((1,1,-1))
@@ -51,18 +52,38 @@ def calc_pair_dict(N):
 
 def j_synchronization(H: np.ndarray, J_conj_dict: dict) -> np.ndarray:
     def arg_min_c(H, i, j, k, J):
-        C_min = 1e9
-        mu_ij_opt, mu_jk_opt, mu_ki_opt = 0, 0, 0
-        for mu_ij in [0,1]:
-            for mu_jk in [0,1]:
-                for mu_ki in [0,1]:
-                    C = np.linalg.norm((np.linalg.matrix_power(J, mu_ij) @ H[3 * i:3 * i + 3, 3 * j:3 * j + 3] @ np.linalg.matrix_power(J, mu_ij)) @
-                                       (np.linalg.matrix_power(J, mu_jk) @ H[3 * j:3 * j + 3, 3 * k:3 * k + 3] @ np.linalg.matrix_power(J, mu_jk)) @
-                                       (np.linalg.matrix_power(J, mu_ki) @ H[3 * k:3 * k + 3, 3 * i:3 * i + 3] @ np.linalg.matrix_power(J, mu_ki)) - np.eye(3))
-                    # print(C)
-                    if C < C_min:
-                        C_min = C
-                        mu_ij_opt, mu_jk_opt, mu_ki_opt = mu_ij, mu_jk, mu_ki
+        H_ij = H[3 * i:3 * i + 3, 3 * j:3 * j + 3]
+        H_jk = H[3 * j:3 * j + 3, 3 * k:3 * k + 3]
+        H_ki = H[3 * k:3 * k + 3, 3 * i:3 * i + 3]
+        H_ij_j_conj = J @ H_ij @ J
+        H_jk_j_conj = J @ H_jk @ J
+        H_ki_j_conj = J @ H_ki @ J
+        mul = np.zeros((8, 3, 3))
+        mul[0] = H_ij @ H_jk @ H_ki
+        mul[1] = H_ij @ H_jk @ H_ki_j_conj
+        mul[2] = H_ij @ H_jk_j_conj @ H_ki
+        mul[3] = H_ij @ H_jk_j_conj @ H_ki_j_conj
+        mul[4] = H_ij_j_conj @ H_jk @ H_ki
+        mul[5] = H_ij_j_conj @ H_jk @ H_ki_j_conj
+        mul[6] = H_ij_j_conj @ H_jk_j_conj @ H_ki
+        mul[7] = H_ij_j_conj @ H_jk_j_conj @ H_ki_j_conj
+        min_idx = np.argmin(np.linalg.norm(mul - np.eye(3),axis=(1,2)))
+        mu_ki_opt = min_idx % 2
+        mu_jk_opt = (min_idx >> 1) % 2
+        mu_ij_opt = (min_idx >> 2) % 2
+
+        # C_min = 1e9
+        # mu_ij_opt, mu_jk_opt, mu_ki_opt = 0, 0, 0
+        # for mu_ij in [0,1]:
+        #     for mu_jk in [0,1]:
+        #         for mu_ki in [0,1]:
+        #             C = np.linalg.norm((np.linalg.matrix_power(J, mu_ij) @ H_ij @ np.linalg.matrix_power(J, mu_ij)) @
+        #                                (np.linalg.matrix_power(J, mu_jk) @ H_jk @ np.linalg.matrix_power(J, mu_jk)) @
+        #                                (np.linalg.matrix_power(J, mu_ki) @ H_ki @ np.linalg.matrix_power(J, mu_ki)) - np.eye(3))
+        #             # print(C)
+        #             if C < C_min:
+        #                 C_min = C
+        #                 mu_ij_opt, mu_jk_opt, mu_ki_opt = mu_ij, mu_jk, mu_ki
         # print('-' * 10)
         return mu_ij_opt, mu_jk_opt, mu_ki_opt
 
@@ -71,15 +92,18 @@ def j_synchronization(H: np.ndarray, J_conj_dict: dict) -> np.ndarray:
     Sigma = np.zeros((int((N-1)*N / 2), int((N-1)*N / 2)))
     pair_dict = calc_pair_dict(N)
 
-    for i in tqdm.tqdm(range(N)):
+    # start = time.time()
+    # for i in tqdm.tqdm(range(N)):
+    for i in range(N):
         for j in range(i+1,N):
             for k in range(j+1, N):
                 mu_ij, mu_jk, mu_ki = arg_min_c(H, i, j, k, J)
 
-                Sigma[pair_dict[(i,j)],pair_dict[(j,k)]] = (-1) ** (mu_ij - mu_jk)
-                Sigma[pair_dict[(j,k)],pair_dict[(k,i)]] = (-1) ** (mu_jk - mu_ki)
-                Sigma[pair_dict[(k,i)],pair_dict[(i,j)]] = (-1) ** (mu_ki - mu_ij)
-
+                Sigma[pair_dict[(i,j)],pair_dict[(j,k)]] = (-1.) ** (mu_ij - mu_jk)
+                Sigma[pair_dict[(j,k)],pair_dict[(k,i)]] = (-1.) ** (mu_jk - mu_ki)
+                Sigma[pair_dict[(k,i)],pair_dict[(i,j)]] = (-1.) ** (mu_ki - mu_ij)
+    # dt = time.time() - start
+    # print('took ', dt, ' seconds')
 
     Sigma = Sigma + Sigma.T
 
@@ -108,20 +132,41 @@ def j_synchronization(H: np.ndarray, J_conj_dict: dict) -> np.ndarray:
 
 np.random.seed(1)
 
-Lambda = 3
-N = 10
-# generate samples according to R_ij = {R_i^T R_j, J R_i^TR_jJ}, where J=diag(1,1,-1)
-Rot, H = generate_data_so3(N, Lambda)
-H = H * N / Lambda
+# Lambda = 3
+N = 50
+Lambda_range = np.arange(1,10,0.1)
+err_no_j_vec = []
+err_with_j_vec =[]
+err_with_j_synch_vec = []
+for Lambda in Lambda_range:
+    # generate samples according to R_ij = {R_i^T R_j, J R_i^TR_jJ}, where J=diag(1,1,-1)
+    Rot, H = generate_data_so3(N, Lambda)
+    H = H * N / Lambda
 
-H, J_conj_dict = apply_j(H, p=0.5)
+    # err with no J conj
+    Rot_est = pim_so3(H)
+    Rot_est = np.real(Rot_est)
+    err_no_j = j_conj_err(Rot_est, Rot)
+    err_no_j_vec.append(err_no_j)
 
-H = j_synchronization(H, J_conj_dict)
-# compute {R_i} with standard synchronization
-Rot_est = pim_so3(H)
-Rot_est = np.real(Rot_est)
-# measure alignment error
+    H, J_conj_dict = apply_j(H, p=0.5)
 
-err_pim = j_conj_err(Rot_est, Rot)
+    # err with J conj without J-synch
+    Rot_est = pim_so3(H)
+    Rot_est = np.real(Rot_est)
+    err_with_j = j_conj_err(Rot_est, Rot)
+    err_with_j_vec.append(err_with_j)
 
-print('err = ', err_pim)
+    # error with J conj and J-synch
+    H = j_synchronization(H, J_conj_dict)
+    Rot_est = pim_so3(H)
+    Rot_est = np.real(Rot_est)
+    err_with_j_synch = j_conj_err(Rot_est, Rot)
+    err_with_j_synch_vec.append(err_with_j_synch)
+
+plt.plot(Lambda_range, err_no_j_vec, label='err_no_j_vec')
+plt.plot(Lambda_range, err_with_j_vec, label='err_with_j_vec')
+plt.plot(Lambda_range, err_with_j_synch_vec, label='err_with_j_synch_vec')
+plt.legend()
+plt.show()
+# print('err = ', err_pim)
