@@ -6,6 +6,12 @@ import tqdm
 import time
 import matplotlib.pyplot as plt
 
+def plot_with_confidence(x,y,std, label, fig, ax):
+    x = np.asarray(x)
+    y = np.asarray(y)
+    base_line, = ax.plot(x, y, label=label)
+    ax.fill_between(x, (y - std), (y + std), color=base_line.get_color(), alpha=.1)
+
 def j_conj_err(Rot_est: np.ndarray, Rot: np.ndarray):
     J = np.diag((1,1,-1))
     err_reg = rel_error_so3(Rot_est, Rot)
@@ -109,15 +115,19 @@ def j_synchronization(H: np.ndarray, J_conj_dict: dict) -> np.ndarray:
 
     # extract the eigenvector that corresponds to the leading eigenvalue of Sigma
     u_s = power_iteration(Sigma)
+    # u_s = power_iteration(Sigma, max_iterations=100, tol=1e-7)
 
     # import matplotlib.pyplot as plt
-    # vals = []
-    # for i in range(N):
-    #     for j in range(i + 1, N):
-    #         if (i, j) in J_conj_dict:
-    #             vals.append(J_conj_dict[(i, j)])
-    #         else:
-    #             vals.append(0)
+    vals = []
+    for i in range(N):
+        for j in range(i + 1, N):
+            if (i, j) in J_conj_dict:
+                vals.append(J_conj_dict[(i, j)])
+            else:
+                vals.append(0)
+    vals = np.expand_dims(np.asarray(vals),axis=-1)
+    err = np.min([np.mean(np.sign(vals-0.5) != np.sign(u_s)),np.mean(np.sign(vals-0.5) != -np.sign(u_s))])
+    # print('j synch err = ', err)
     # plt.plot(vals, label='true')
     # plt.plot(u_s, label='estimated')
     # plt.show()
@@ -133,40 +143,63 @@ def j_synchronization(H: np.ndarray, J_conj_dict: dict) -> np.ndarray:
 np.random.seed(1)
 
 # Lambda = 3
-N = 50
-Lambda_range = np.arange(1,10,0.1)
+# N = 50
+# Lambda_range = np.arange(1,10,1)
+N = 20
+R = 20
+Lambda_range = np.arange(1,9,.25)
+# Lambda_range = [10]
+err_no_j_acc = []
+err_with_j_acc = []
+err_with_j_synch_acc = []
 err_no_j_vec = []
+err_no_j_vec_std = []
 err_with_j_vec =[]
+err_with_j_vec_std =[]
 err_with_j_synch_vec = []
+err_with_j_synch_vec_std = []
 for Lambda in Lambda_range:
-    # generate samples according to R_ij = {R_i^T R_j, J R_i^TR_jJ}, where J=diag(1,1,-1)
-    Rot, H = generate_data_so3(N, Lambda)
-    H = H * N / Lambda
+    err_no_j_acc = []
+    err_with_j_acc = []
+    err_with_j_synch_acc = []
+    for r in range(R):
+        # generate samples according to R_ij = {R_i^T R_j, J R_i^TR_jJ}, where J=diag(1,1,-1)
+        Rot, H = generate_data_so3(N, Lambda)
+        H = H * N / Lambda
+        # err with no J conj
+        Rot_est = pim_so3(H)
+        Rot_est = np.real(Rot_est)
+        err_no_j = j_conj_err(Rot_est, Rot)
+        err_no_j_acc.append(err_no_j)
+        H, J_conj_dict = apply_j(H, p=0.5)
 
-    # err with no J conj
-    Rot_est = pim_so3(H)
-    Rot_est = np.real(Rot_est)
-    err_no_j = j_conj_err(Rot_est, Rot)
-    err_no_j_vec.append(err_no_j)
+        # err with J conj without J-synch
+        Rot_est = pim_so3(H)
+        Rot_est = np.real(Rot_est)
+        err_with_j = j_conj_err(Rot_est, Rot)
+        err_with_j_acc.append(err_with_j)
 
-    H, J_conj_dict = apply_j(H, p=0.5)
+        # error with J conj and J-synch
+        H = j_synchronization(H, J_conj_dict)
+        Rot_est = pim_so3(H)
+        Rot_est = np.real(Rot_est)
+        err_with_j_synch = j_conj_err(Rot_est, Rot)
+        err_with_j_synch_acc.append(err_with_j_synch)
 
-    # err with J conj without J-synch
-    Rot_est = pim_so3(H)
-    Rot_est = np.real(Rot_est)
-    err_with_j = j_conj_err(Rot_est, Rot)
-    err_with_j_vec.append(err_with_j)
+    err_no_j_vec.append(np.mean(err_no_j_acc))
+    err_no_j_vec_std.append(np.std(err_no_j_acc))
+    err_with_j_vec.append(np.mean(err_with_j_acc))
+    err_with_j_vec_std.append(np.std(err_with_j_acc))
+    err_with_j_synch_vec.append(np.mean(err_with_j_synch_acc))
+    err_with_j_synch_vec_std.append(np.std(err_with_j_synch_acc))
 
-    # error with J conj and J-synch
-    H = j_synchronization(H, J_conj_dict)
-    Rot_est = pim_so3(H)
-    Rot_est = np.real(Rot_est)
-    err_with_j_synch = j_conj_err(Rot_est, Rot)
-    err_with_j_synch_vec.append(err_with_j_synch)
-
-plt.plot(Lambda_range, err_no_j_vec, label='err_no_j_vec')
-plt.plot(Lambda_range, err_with_j_vec, label='err_with_j_vec')
-plt.plot(Lambda_range, err_with_j_synch_vec, label='err_with_j_synch_vec')
+fig, ax = plt.subplots()
+plot_with_confidence(Lambda_range, err_no_j_vec,err_no_j_vec_std, 'err without J ambiguity', fig, ax)
+plot_with_confidence(Lambda_range, err_with_j_vec, err_with_j_vec_std, 'err with J ambiguity', fig, ax)
+plot_with_confidence(Lambda_range, err_with_j_synch_vec, err_with_j_synch_vec_std, 'err with J ambiguity using J-Synch', fig, ax)
+plt.xlabel('$SNR$')
+plt.ylabel('Alignment Error')
+plt.title(f'Error comparison with N={N}')
 plt.legend()
 plt.show()
 # print('err = ', err_pim)
