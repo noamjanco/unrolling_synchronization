@@ -8,6 +8,19 @@ from synchronization.pim import pim_so3
 from synchronization.ppm import ppm_so3
 
 
+def apply_j(H: np.ndarray, p : float = 0.5):
+    J = np.diag((1,1,-1))
+    N = int(H.shape[0] / 3)
+    d = {}
+    for i in range(N):
+        for j in range(i+1,N):
+            if np.random.rand() < p:
+                d[(i,j)] = 1
+                H[3 * i:3 * i + 3, 3 * j:3 * j + 3] = J @ H[3 * i:3 * i + 3, 3 * j:3 * j + 3] @ J
+                H[3 * j:3 * j + 3, 3 * i:3 * i + 3] = J @ H[3 * j:3 * j + 3, 3 * i:3 * i + 3] @ J
+    return H, d
+
+
 def generate_data_so3(N: int, Lambda: float) -> [List[np.ndarray], np.ndarray]:
 
     H = np.zeros((3*N, 3*N))
@@ -51,6 +64,29 @@ def generate_training_data_so3(N: int, Lambda: float, R: int) -> [np.ndarray, np
     H_total = np.asarray(H_total)
 
     return Rot_total, H_total
+
+
+def generate_training_data_so3_with_j_ambiguity(N: int, Lambda: float, R: int) -> [np.ndarray, np.ndarray]:
+    Rot_total = []
+    H_total = []
+    for r in range(R):
+        Rot_mat, H  = generate_data_so3(N, Lambda)
+
+        H, _ = apply_j(H, p=0.5)
+
+        # #todo: Return Rot_mat inside generate data so3
+        # Rot_mat = np.zeros((3 * N, 3))
+        # for i in range(N):
+        #     Rot_mat[3 * i:3 * i + 3, :] = Rot[i]
+
+        Rot_total.append(Rot_mat)
+        H_total.append(H)
+
+    Rot_total = np.asarray(Rot_total)
+    H_total = np.asarray(H_total)
+
+    return Rot_total, H_total
+
 
 if __name__ == '__main__':
     print('Main script')
