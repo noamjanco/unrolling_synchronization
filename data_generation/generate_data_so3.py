@@ -8,17 +8,27 @@ from synchronization.pim import pim_so3
 from synchronization.ppm import ppm_so3
 
 
-def apply_j(H: np.ndarray, p : float = 0.5):
+def apply_j(H: np.ndarray, p : float = 0.5) -> (np.ndarray, dict):
+    """
+    Apply J ambiguity (handedness) on relative rotation matrix H.
+    An inverse handedness of H_ij is J @ H @ J
+    :param H: Relative rotation matrix of size 3N x 3N, where N is the number of measurements.
+    :param p: Probability of a pair with inverse handedness.
+    :return: a tuple that consist of:
+            1. The relative rotation matrix with J ambiguity
+            2. A dictionary where the keys indicate whether a relative rotation has inverse handedness.
+    """
     J = np.diag((1,1,-1))
     N = int(H.shape[0] / 3)
     d = {}
+    H_j_ambiguity = np.copy(H)
     for i in range(N):
         for j in range(i+1,N):
             if np.random.rand() < p:
                 d[(i,j)] = 1
-                H[3 * i:3 * i + 3, 3 * j:3 * j + 3] = J @ H[3 * i:3 * i + 3, 3 * j:3 * j + 3] @ J
-                H[3 * j:3 * j + 3, 3 * i:3 * i + 3] = J @ H[3 * j:3 * j + 3, 3 * i:3 * i + 3] @ J
-    return H, d
+                H_j_ambiguity[3 * i:3 * i + 3, 3 * j:3 * j + 3] = J @ H[3 * i:3 * i + 3, 3 * j:3 * j + 3] @ J
+                H_j_ambiguity[3 * j:3 * j + 3, 3 * i:3 * i + 3] = J @ H[3 * j:3 * j + 3, 3 * i:3 * i + 3] @ J
+    return H_j_ambiguity, d
 
 
 def generate_data_so3(N: int, Lambda: float) -> [List[np.ndarray], np.ndarray]:
