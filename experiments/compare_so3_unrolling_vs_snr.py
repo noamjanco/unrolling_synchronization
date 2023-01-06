@@ -98,13 +98,13 @@ class CompareSO3UnrollingVsSNRExperiment(Experiment):
         avg_loss_pim_vs_d = [np.mean(df[df.Lambda == x].loss_pim) for x in Lambda_range]
         avg_loss_amp_vs_d = [np.mean(df[df.Lambda == x].loss_amp) for x in Lambda_range]
         avg_loss_nn_vs_d = [np.mean(df[df.Lambda == x].loss_nn) for x in Lambda_range]
-        plt.plot(Lambda_range, avg_loss_ppm_vs_d)
-        plt.plot(Lambda_range, avg_loss_pim_vs_d)
+        plt.plot(Lambda_range, avg_loss_ppm_vs_d, '-o')
+        plt.plot(Lambda_range, avg_loss_pim_vs_d, '-^')
         # plt.plot(depth_range, avg_loss_amp_vs_d)
-        plt.plot(Lambda_range, avg_loss_nn_vs_d, color=u'#d62728')
-        plt.legend(['PPM', 'PIM', 'NN'])
-        plt.xlabel(r'$\lambda$')
-        plt.ylabel('Mean Error')
+        plt.plot(Lambda_range, avg_loss_nn_vs_d, '-*', color=u'#d62728')
+        plt.legend(['PPM', 'spectral method', 'unrolled algorithm'],fontsize=14)
+        plt.xlabel(r'$\lambda$',fontsize=16)
+        plt.ylabel('Mean Error',fontsize=16)
         plt.savefig(self.get_results_path()+'_vs_snr.eps')
         plt.savefig(self.get_results_path()+'_vs_snr.png')
         plt.clf()
@@ -118,6 +118,6 @@ if __name__ == '__main__':
     # CompareSO3UnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1,3,5,9,15,20], 'epochs': 100, 'Lambda': 1.5})
     # CompareSO3UnrollingVsSNRExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'Lambda_range': np.arange(0.25,3.5,0.25), 'depth': 9, 'epochs': 20, 'num_iterations': 100})
     # CompareSO3UnrollingVsSNRExperiment(params={'N': 20, 'R': 1000, 'num_trials': 1, 'Lambda_range': np.arange(0.25,3.5,0.25), 'depth': 9, 'epochs': 20, 'num_iterations': 100})
-    CompareSO3UnrollingVsSNRExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'Lambda_range': np.arange(0.25,3.5,0.25), 'depth': 9, 'epochs': 100, 'num_iterations': 100})
+    CompareSO3UnrollingVsSNRExperiment(params={'N': 40, 'R': 10000, 'num_trials': 1, 'Lambda_range': np.arange(0.25,3.5,0.25), 'depth': 9, 'epochs': 100, 'num_iterations': 100})
     # CompareSO3UnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [9], 'epochs': 10, 'Lambda': 1.2})
     # CompareGaussianUnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 300, 'Lambda': 1.5, 'L': 10})

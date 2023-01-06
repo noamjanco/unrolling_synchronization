@@ -102,14 +102,14 @@ class CompareZOver2UnrollingVsSNRExperiment(Experiment):
         avg_loss_pim_vs_d = [np.mean(df[df.Lambda == x].loss_pim) for x in Lambda_range]
         avg_loss_amp_vs_d = [np.mean(df[df.Lambda == x].loss_amp) for x in Lambda_range]
         avg_loss_nn_vs_d = [np.mean(df[df.Lambda == x].loss_nn) for x in Lambda_range]
-        plt.plot(Lambda_range, avg_loss_ppm_vs_d)
-        plt.plot(Lambda_range, avg_loss_pim_vs_d)
+        plt.plot(Lambda_range, avg_loss_ppm_vs_d, '-o')
+        plt.plot(Lambda_range, avg_loss_pim_vs_d, '-^')
 
-        plt.plot(Lambda_range, avg_loss_amp_vs_d)
-        plt.plot(Lambda_range, avg_loss_nn_vs_d)
-        plt.legend(['PPM', 'PIM', 'AMP', 'NN'])
-        plt.xlabel(r'$\lambda$')
-        plt.ylabel('Mean Error')
+        plt.plot(Lambda_range, avg_loss_amp_vs_d, '-s')
+        plt.plot(Lambda_range, avg_loss_nn_vs_d, '-*')
+        plt.legend(['PPM', 'PM', 'AMP', 'unrolled algorithm'],fontsize=14)
+        plt.xlabel(r'$\lambda$',fontsize=16)
+        plt.ylabel('Mean Error',fontsize=16)
         plt.savefig(self.get_results_path()+'.eps')
         plt.savefig(self.get_results_path()+'.png')
         plt.clf()
@@ -118,4 +118,5 @@ class CompareZOver2UnrollingVsSNRExperiment(Experiment):
 if __name__ == '__main__':
     # CompareZOver2UnrollingExperiment(params={'N': 20, 'R': 20000, 'num_trials': 1, 'Lambda_range': np.arange(0.5,2.75,0.25), 'epochs': 300, 'NN_depth': 9, 'num_iterations': 100})
     # CompareZOver2UnrollingVsSNRExperiment(params={'N': 20, 'R': 20000, 'num_trials': 1, 'Lambda_range': np.arange(0.25,3.25,0.25), 'epochs': 300, 'depth': 9, 'num_iterations': 100})
-    CompareZOver2UnrollingVsSNRExperiment(params={'N': 20, 'R': 20000, 'num_trials': 1, 'Lambda_range': np.arange(0.25,3.5,0.25), 'epochs': 100, 'depth': 9, 'num_iterations': 100})
+    # CompareZOver2UnrollingVsSNRExperiment(params={'N': 20, 'R': 20000, 'num_trials': 1, 'Lambda_range': np.arange(0.25,3.5,0.25), 'epochs': 100, 'depth': 9, 'num_iterations': 100})
+    CompareZOver2UnrollingVsSNRExperiment(params={'N': 40, 'R': 20000, 'num_trials': 1, 'Lambda_range': np.arange(0.25,3.5,0.25), 'epochs': 100, 'depth': 9, 'num_iterations': 100})

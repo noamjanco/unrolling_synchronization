@@ -132,13 +132,13 @@ class Compare1dMRAUnrollingReconstructionLossExperiment(Experiment):
         avg_loss_pim_vs_d = [np.mean(df[df.DEPTH == x].loss_pim) for x in depth_range]
         avg_loss_amp_vs_d = [np.mean(df[df.DEPTH == x].loss_amp) for x in depth_range]
         avg_loss_nn_vs_d = [np.mean(df[df.DEPTH == x].loss_nn) for x in depth_range]
-        plt.plot(depth_range, avg_loss_ppm_vs_d)
-        plt.plot(depth_range, avg_loss_pim_vs_d)
-        plt.plot(depth_range, avg_loss_amp_vs_d)
-        plt.plot(depth_range, avg_loss_nn_vs_d)
-        plt.legend(['PPM', 'PIM', 'AMP', 'NN'])
-        plt.xlabel('Depth')
-        plt.ylabel('Mean Error')
+        plt.plot(depth_range, avg_loss_ppm_vs_d, '-o')
+        plt.plot(depth_range, avg_loss_pim_vs_d, '-^')
+        plt.plot(depth_range, avg_loss_amp_vs_d, '-s')
+        plt.plot(depth_range, avg_loss_nn_vs_d, '-*')
+        plt.legend(['PPM', 'PM', 'AMP', 'unrolled algorithm'], fontsize=16,loc='upper right')
+        plt.xlabel('Depth / Iterations', fontsize=16)
+        plt.ylabel('Mean Error', fontsize=16)
         plt.savefig(self.get_results_path()+'.eps')
         plt.savefig(self.get_results_path()+'.png')
         plt.clf()
@@ -147,5 +147,6 @@ class Compare1dMRAUnrollingReconstructionLossExperiment(Experiment):
 if __name__ == '__main__':
     # Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 1000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15], 'epochs': 500, 'Lambda': 1, 'L': 21})
     # Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [5], 'epochs': 500, 'Lambda': 1, 'L': 21})
+    # Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20], 'epochs': 200, 'Lambda': 1, 'L': 21})
     Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20], 'epochs': 200, 'Lambda': 1, 'L': 21})
     # Compare1dMRAUnrollingReconstructionLossExperiment(params={'N': 20, 'R': 1000, 'num_trials': 1, 'depth_range': [5], 'epochs': 2, 'Lambda': 1, 'L': 21})

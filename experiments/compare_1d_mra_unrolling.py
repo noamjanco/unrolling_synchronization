@@ -114,13 +114,13 @@ class Compare1dMRAUnrollingExperiment(Experiment):
         avg_loss_pim_vs_d = [np.mean(df[df.DEPTH == x].loss_pim) for x in depth_range]
         avg_loss_amp_vs_d = [np.mean(df[df.DEPTH == x].loss_amp) for x in depth_range]
         avg_loss_nn_vs_d = [np.mean(df[df.DEPTH == x].loss_nn) for x in depth_range]
-        plt.plot(depth_range, avg_loss_ppm_vs_d)
-        plt.plot(depth_range, avg_loss_pim_vs_d)
-        plt.plot(depth_range, avg_loss_amp_vs_d)
-        plt.plot(depth_range, avg_loss_nn_vs_d)
-        plt.legend(['PPM', 'PIM', 'AMP', 'NN'])
-        plt.xlabel('Depth')
-        plt.ylabel('Mean Error')
+        plt.plot(depth_range, avg_loss_ppm_vs_d, '-o')
+        plt.plot(depth_range, avg_loss_pim_vs_d, '-^')
+        plt.plot(depth_range, avg_loss_amp_vs_d, '-s')
+        plt.plot(depth_range, avg_loss_nn_vs_d, '-*')
+        plt.legend(['PPM', 'PM', 'AMP', 'unrolled algorithm'], fontsize=16,loc='upper right')
+        plt.xlabel('Depth / Iterations', fontsize=16)
+        plt.ylabel('Mean Error', fontsize=16)
         plt.savefig(self.get_results_path()+'.eps')
         plt.savefig(self.get_results_path()+'.png')
         plt.clf()
