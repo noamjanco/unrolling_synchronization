@@ -1,5 +1,5 @@
 from common.math_utils import rel_error_so3
-from data_generation.generate_data_so3 import generate_data_so3
+from data_generation.generate_data_so3 import generate_data_so3, apply_j
 from synchronization.pim import pim_so3
 import numpy as np
 import tqdm
@@ -21,18 +21,6 @@ def j_conj_err(Rot_est: np.ndarray, Rot: np.ndarray):
         Rot_est_j_conj[3*i:3*i+3,:] = J @ Rot_est[3*i:3*i+3,:] @ J
     err_j_conj = rel_error_so3(Rot_est_j_conj, Rot)
     return min(err_reg, err_j_conj)
-
-def apply_j(H: np.ndarray, p : float = 0.5):
-    J = np.diag((1,1,-1))
-    N = int(H.shape[0] / 3)
-    d = {}
-    for i in range(N):
-        for j in range(i+1,N):
-            if np.random.rand() < p:
-                d[(i,j)] = 1
-                H[3 * i:3 * i + 3, 3 * j:3 * j + 3] = J @ H[3 * i:3 * i + 3, 3 * j:3 * j + 3] @ J
-                H[3 * j:3 * j + 3, 3 * i:3 * i + 3] = J @ H[3 * j:3 * j + 3, 3 * i:3 * i + 3] @ J
-    return H, d
 
 def power_iteration(Sigma: np.ndarray, max_iterations=100, tol=1e-5) -> np.ndarray:
     v = 1e-3 * np.ones((Sigma.shape[0],1))
