@@ -156,6 +156,7 @@ def j_synch_forward(H: np.ndarray):
     u_s = v_new
 
     gather_idx  = []
+    gather_idx2  = []
     u_s_gather_idx = []
     for b in range(batchsize):
         for i in range(N):
@@ -165,48 +166,57 @@ def j_synch_forward(H: np.ndarray):
                 for x in range(3):
                     for y in range(3):
                         gather_idx.append([b, 3 * i + x, 3 * j + y])
+                        gather_idx2.append([b, 3 * j + x, 3 * i + y])
 
     u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, u_s_gather_idx), 0),(batchsize,-1)),tf.float32)
     H_gather = tf.reshape(tf.gather_nd(H, gather_idx), (batchsize,-1, 3, 3))
+    H_gather2 = tf.reshape(tf.gather_nd(H, gather_idx2), (batchsize,-1, 3, 3))
     without_j = tf.repeat(tf.expand_dims(tf.repeat(tf.expand_dims(tf.eye(3),axis=0),u_s_gather.shape[1],axis=0),axis=0),u_s_gather.shape[0],axis=0)
     with_j = tf.repeat(tf.expand_dims(tf.repeat(tf.expand_dims(tf.linalg.diag((1., 1., -1.)),axis=0),u_s_gather.shape[1],axis=0),axis=0),u_s_gather.shape[0],axis=0)
     indicator = tf.transpose(tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.expand_dims(u_s_gather,axis=-1),3,axis=-1)),axis=0),3,axis=0))
     J_mat =  indicator * with_j + (1-indicator) * without_j
 
     H_conj = J_mat @ H_gather @ J_mat
+    H2_conj = J_mat @ H_gather2 @ J_mat
 
-    for b in range(batchsize):
+    # H1_scatter = tf.scatter_nd(gather_idx, tf.reshape(H_conj,-1),shape=H.shape)
+    # H2_scatter = tf.scatter_nd(gather_idx, tf.reshape(H2_conj,-1),shape=H.shape)
+    H1_scatter = tf.scatter_nd(gather_idx, tf.reshape(tf.transpose(H_conj,[0,1,2,3]),-1),shape=H.shape)
+    H2_scatter = tf.scatter_nd(gather_idx, tf.reshape(tf.transpose(H2_conj,[0,1,2,3]),-1),shape=H.shape)
+    H = H1_scatter + H2_scatter
 
-        # # apply J()J to each relative measurement with u < 0
-        # gather_idx  = []
-        # u_s_gather_idx = []
-        # for i in range(N):
-        #     for j in range(i + 1, N):
-        #         #todo: this is just increasing (range)
-        #         u_s_gather_idx.append(pair_dict[(i, j)])
-        #         for x in range(3):
-        #             for y in range(3):
-        #                 gather_idx.append([b, 3 * i + x, 3 * j + y])
-        #
-        # H_gather = tf.reshape(tf.gather_nd(H, gather_idx), (1, -1, 3, 3))
-        # u_s_gather = tf.less(tf.gather(u_s, u_s_gather_idx), 0)
-        # #todo: create j mat
-        # without_j = tf.repeat(tf.expand_dims(tf.eye(3),axis=0),u_s_gather.shape[0],axis=0)
-        # with_j = tf.repeat(tf.expand_dims(tf.linalg.diag((1., 1., -1.)),axis=0),u_s_gather.shape[0],axis=0)
-        # # u_s_rs = tf.transpose(tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.cast(u_s_gather,tf.float32),3,axis=-1)),axis=0),3,axis=0))
-        # #todo: fix reshape
-        # J_mat = tf.transpose(tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.cast(u_s_gather,tf.float32),3,axis=-1)),axis=0),3,axis=0)) * with_j + (1-tf.transpose(tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.cast(u_s_gather,tf.float32),3,axis=-1)),axis=0),3,axis=0))) * without_j
-        #
-        # # without_j = tf.scatter_nd()
-        # # J_mat = without_j # todo:fixme
-        # H = tf.scatter_nd(gather_idx, J_mat @ H_gather @ J_mat)
-        # u_s = power_iteration(Sigma[b])
-        for i in range(N):
-            for j in range(i + 1, N):
-                # if u_s[pair_dict[(i, j)]] < 0:
-                if u_s[b, pair_dict[(i, j)]] < 0:
-                    H[b,3 * i:3 * i + 3, 3 * j:3 * j + 3] = J @ H[b,3 * i:3 * i + 3, 3 * j:3 * j + 3] @ J
-                    H[b,3 * j:3 * j + 3, 3 * i:3 * i + 3] = J @ H[b,3 * j:3 * j + 3, 3 * i:3 * i + 3] @ J
+    # for b in range(batchsize):
+    #
+    #     # # apply J()J to each relative measurement with u < 0
+    #     # gather_idx  = []
+    #     # u_s_gather_idx = []
+    #     # for i in range(N):
+    #     #     for j in range(i + 1, N):
+    #     #         #todo: this is just increasing (range)
+    #     #         u_s_gather_idx.append(pair_dict[(i, j)])
+    #     #         for x in range(3):
+    #     #             for y in range(3):
+    #     #                 gather_idx.append([b, 3 * i + x, 3 * j + y])
+    #     #
+    #     # H_gather = tf.reshape(tf.gather_nd(H, gather_idx), (1, -1, 3, 3))
+    #     # u_s_gather = tf.less(tf.gather(u_s, u_s_gather_idx), 0)
+    #     # #todo: create j mat
+    #     # without_j = tf.repeat(tf.expand_dims(tf.eye(3),axis=0),u_s_gather.shape[0],axis=0)
+    #     # with_j = tf.repeat(tf.expand_dims(tf.linalg.diag((1., 1., -1.)),axis=0),u_s_gather.shape[0],axis=0)
+    #     # # u_s_rs = tf.transpose(tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.cast(u_s_gather,tf.float32),3,axis=-1)),axis=0),3,axis=0))
+    #     # #todo: fix reshape
+    #     # J_mat = tf.transpose(tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.cast(u_s_gather,tf.float32),3,axis=-1)),axis=0),3,axis=0)) * with_j + (1-tf.transpose(tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.cast(u_s_gather,tf.float32),3,axis=-1)),axis=0),3,axis=0))) * without_j
+    #     #
+    #     # # without_j = tf.scatter_nd()
+    #     # # J_mat = without_j # todo:fixme
+    #     # H = tf.scatter_nd(gather_idx, J_mat @ H_gather @ J_mat)
+    #     # u_s = power_iteration(Sigma[b])
+    #     for i in range(N):
+    #         for j in range(i + 1, N):
+    #             # if u_s[pair_dict[(i, j)]] < 0:
+    #             if u_s[b, pair_dict[(i, j)]] < 0:
+    #                 H[b,3 * i:3 * i + 3, 3 * j:3 * j + 3] = J @ H[b,3 * i:3 * i + 3, 3 * j:3 * j + 3] @ J
+    #                 H[b,3 * j:3 * j + 3, 3 * i:3 * i + 3] = J @ H[b,3 * j:3 * j + 3, 3 * i:3 * i + 3] @ J
     return H
 
 
