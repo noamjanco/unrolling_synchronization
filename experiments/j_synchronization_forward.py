@@ -179,10 +179,10 @@ def j_synch_forward(H: np.ndarray):
     H_conj = J_mat @ H_gather @ J_mat
     H2_conj = J_mat @ H_gather2 @ J_mat
 
-    # H1_scatter = tf.scatter_nd(gather_idx, tf.reshape(H_conj,-1),shape=H.shape)
-    # H2_scatter = tf.scatter_nd(gather_idx, tf.reshape(H2_conj,-1),shape=H.shape)
-    H1_scatter = tf.scatter_nd(gather_idx, tf.reshape(tf.transpose(H_conj,[0,1,2,3]),-1),shape=H.shape)
-    H2_scatter = tf.scatter_nd(gather_idx, tf.reshape(tf.transpose(H2_conj,[0,1,2,3]),-1),shape=H.shape)
+    H1_scatter = tf.scatter_nd(gather_idx, tf.reshape(H_conj,-1),shape=H.shape)
+    H2_scatter = tf.scatter_nd(gather_idx2, tf.reshape(H2_conj,-1),shape=H.shape)
+    # H1_scatter = tf.scatter_nd(gather_idx, tf.reshape(tf.transpose(H_conj,[0,2,3,2]),-1),shape=H.shape)
+    # H2_scatter = tf.scatter_nd(gather_idx, tf.reshape(tf.transpose(H2_conj,[0,2,3,2]),-1),shape=H.shape)
     H = H1_scatter + H2_scatter
 
     # for b in range(batchsize):
