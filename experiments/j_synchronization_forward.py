@@ -87,30 +87,19 @@ def calc_pair_dict(N):
             idx +=1
     return d
 
-
-def j_synch_forward(H: np.ndarray):
-    batchsize = H.shape[0]
+def calc_err(H) -> tf.Tensor:
     N = int(H.shape[1]/3)
-    shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
-
-    J = tf.expand_dims(tf.linalg.diag((1., 1., -1.)), axis=0)
+    batchsize = H.shape[0]
     J_block = tf.expand_dims(tf.linalg.diag(tf.tile((1., 1., -1.), [N])), axis=0)
 
     H_j_conj = J_block @ H @ J_block
 
-    Hij = tf.reshape(tf.gather_nd(H, ijs), (batchsize, -1, 3, 3))
-    Hij_j_conj = tf.reshape(tf.gather_nd(H_j_conj, ijs), (batchsize, -1, 3, 3))
-    Hjk = tf.reshape(tf.gather_nd(H, jks), (batchsize, -1, 3, 3))
-    Hjk_j_conj = tf.reshape(tf.gather_nd(H_j_conj, jks), (batchsize, -1, 3, 3))
-    Hki = tf.reshape(tf.gather_nd(H, kis), (batchsize, -1, 3, 3))
-    Hki_j_conj = tf.reshape(tf.gather_nd(H_j_conj, kis), (batchsize, -1, 3, 3))
-
-    H_ij = tf.reshape(Hij, (-1, 3, 3))
-    H_ij_j_conj = tf.reshape(Hij_j_conj, (-1, 3, 3))
-    H_jk = tf.reshape(Hjk, (-1, 3, 3))
-    H_jk_j_conj = tf.reshape(Hjk_j_conj, (-1, 3, 3))
-    H_ki = tf.reshape(Hki, (-1, 3, 3))
-    H_ki_j_conj = tf.reshape(Hki_j_conj, (-1, 3, 3))
+    H_ij = tf.reshape(tf.gather_nd(H, ijs), (-1, 3, 3))
+    H_ij_j_conj = tf.reshape(tf.gather_nd(H_j_conj, ijs), (-1, 3, 3))
+    H_jk = tf.reshape(tf.gather_nd(H, jks), (-1, 3, 3))
+    H_jk_j_conj = tf.reshape(tf.gather_nd(H_j_conj, jks), (-1, 3, 3))
+    H_ki = tf.reshape(tf.gather_nd(H, kis), (-1, 3, 3))
+    H_ki_j_conj = tf.reshape(tf.gather_nd(H_j_conj, kis), (-1, 3, 3))
 
     err0 = tf.linalg.norm(H_ij @ H_jk @ H_ki - tf.eye(3), axis=[1, 2])
     err1 = tf.linalg.norm(H_ij @ H_jk @ H_ki_j_conj - tf.eye(3), axis=[1, 2])
@@ -123,13 +112,25 @@ def j_synch_forward(H: np.ndarray):
 
     err = tf.stack([err0, err1, err2, err3, err4, err5, err6, err7], axis=-1)
     err_rs = tf.reshape(err, (batchsize, -1, 8))
+    return err_rs
 
+def calc_mu(err_rs: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
     min_ind = tf.argmin(err_rs, axis=-1)
-    mu_ki_opt = tf.math.floormod(min_ind / 1, 2)
-    mu_jk_opt = tf.math.floormod(tf.floor(min_ind / 2), 2)
     mu_ij_opt = tf.math.floormod(tf.floor(min_ind / 4), 2)
+    mu_jk_opt = tf.math.floormod(tf.floor(min_ind / 2), 2)
+    mu_ki_opt = tf.math.floormod(min_ind / 1, 2)
+    return mu_ij_opt, mu_jk_opt, mu_ki_opt
 
-    # Build the matrix Sigma
+def build_sigma(mu_ij_opt: tf.Tensor, mu_jk_opt: tf.Tensor, mu_ki_opt: tf.Tensor) -> tf.Tensor:
+    """
+    Build the matrix sigma from mu_ij_opt, mu_jk_opt, mu_ki_opt
+    :param mu_ij_opt:
+    :param mu_jk_opt:
+    :param mu_ki_opt:
+    :return: Matrix sigma of size (batch_size , (N - 1) * N / 2 , (N - 1) * N / 2)
+    """
+    shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
+
     res1 = tf.map_fn(lambda x: tf.scatter_nd(indices=_ij_jk, updates=x, shape=shape),
                      tf.pow(-1., mu_ij_opt - mu_jk_opt))
     res2 = tf.map_fn(lambda x: tf.scatter_nd(indices=_jk_ki, updates=x, shape=shape),
@@ -137,86 +138,71 @@ def j_synch_forward(H: np.ndarray):
     res3 = tf.map_fn(lambda x: tf.scatter_nd(indices=_ki_ij, updates=x, shape=shape),
                      tf.pow(-1., mu_ki_opt - mu_ij_opt))
     Sigma = res1 + res2 + res3
-    Sigma = Sigma + tf.transpose(Sigma,perm=[0,2,1])
+    Sigma = Sigma + tf.transpose(Sigma, perm=[0, 2, 1])
+    return Sigma
 
-    #todo: u_s in this point should be batchsize x sigma.shape[1]
-
-    #todo: construct J matrix of size batchsize x 3N x 3N such that block[b,i,j] is diag(1,1,-1) if u_s[pair_dict(i,j)] <0 else diag(1,1,1)
-    #todo: power iteration over batch
-
-    # Unroll PIM
+def unroll_pim(sigma: tf.Tensor, depth: int = 100) -> tf.Tensor:
+    """
+    Perform unrolled power iteration on input sigma
+    :param sigma: Input matrix of size (batch_size , (N - 1) * N / 2 , (N - 1) * N / 2)
+    :param depth: how many iterations to unroll
+    :return: Eigenvector of Sigma
+    """
     # u_s = model.predict([np.asarray(x_init,dtype=np.float64), np.asarray(x_init,dtype=np.float64), np.asarray(Sigma,dtype=np.float64)])
-    x_init = 1e-3*np.expand_dims(np.ones((batchsize,Sigma.shape[1])),axis=-1)
+    x_init = 1e-3*np.expand_dims(np.ones((sigma.shape[0],sigma.shape[1])),axis=-1)
     v = x_init
-    DEPTH=100
-    for i in range(DEPTH):
-        v_new = Sigma @ v
+    for i in range(depth):
+        v_new = sigma @ v
         v_new = tf.divide(v_new,tf.expand_dims(tf.linalg.norm(v_new,axis=1),axis=-1))
         v = v_new
-    u_s = v_new
+    return v_new
 
-    gather_idx  = []
-    gather_idx2  = []
-    u_s_gather_idx = []
-    for b in range(batchsize):
-        for i in range(N):
-            for j in range(i + 1, N):
-                #todo: this is just increasing (range)
-                u_s_gather_idx.append([b,pair_dict[(i, j)],0])
-                for x in range(3):
-                    for y in range(3):
-                        gather_idx.append([b, 3 * i + x, 3 * j + y])
-                        gather_idx2.append([b, 3 * j + x, 3 * i + y])
-
-    u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, u_s_gather_idx), 0),(batchsize,-1)),tf.float32)
-    H_gather = tf.reshape(tf.gather_nd(H, gather_idx), (batchsize,-1, 3, 3))
-    H_gather2 = tf.reshape(tf.gather_nd(H, gather_idx2), (batchsize,-1, 3, 3))
-    without_j = tf.repeat(tf.expand_dims(tf.repeat(tf.expand_dims(tf.eye(3),axis=0),u_s_gather.shape[1],axis=0),axis=0),u_s_gather.shape[0],axis=0)
-    with_j = tf.repeat(tf.expand_dims(tf.repeat(tf.expand_dims(tf.linalg.diag((1., 1., -1.)),axis=0),u_s_gather.shape[1],axis=0),axis=0),u_s_gather.shape[0],axis=0)
-    indicator = tf.transpose(tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.expand_dims(u_s_gather,axis=-1),3,axis=-1)),axis=0),3,axis=0))
-    J_mat =  indicator * with_j + (1-indicator) * without_j
+def correct_j_ambiguity(H: tf.Tensor, u_s: tf.Tensor) -> tf.Tensor:
+    """
+    Correct J ambiguity of H according to the estimate u_s
+    :param H: Input relative rotation matrix, of size (batch_size, 3*N, 3*N)
+    :param u_s: Estimated eigenvector of Sigma, indicates which pair contains J ambiguity
+    :return: H without J ambiguity
+    """
+    u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, u_s_gather_idx), 0), (batchsize, -1)), tf.float32)
+    H_gather = tf.reshape(tf.gather_nd(H, gather_idx), (batchsize, -1, 3, 3))
+    H_gather2 = tf.reshape(tf.gather_nd(H, gather_idx2), (batchsize, -1, 3, 3))
+    without_j = tf.repeat(
+        tf.expand_dims(tf.repeat(tf.expand_dims(tf.eye(3), axis=0), u_s_gather.shape[1], axis=0), axis=0),
+        u_s_gather.shape[0], axis=0)
+    with_j = tf.repeat(
+        tf.expand_dims(tf.repeat(tf.expand_dims(tf.linalg.diag((1., 1., -1.)), axis=0), u_s_gather.shape[1], axis=0),
+                       axis=0), u_s_gather.shape[0], axis=0)
+    indicator = tf.transpose(
+        tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.expand_dims(u_s_gather, axis=-1), 3, axis=-1)), axis=0), 3,
+                  axis=0))
+    J_mat = indicator * with_j + (1 - indicator) * without_j
 
     H_conj = J_mat @ H_gather @ J_mat
     H2_conj = J_mat @ H_gather2 @ J_mat
 
-    H1_scatter = tf.scatter_nd(gather_idx, tf.reshape(H_conj,-1),shape=H.shape)
-    H2_scatter = tf.scatter_nd(gather_idx2, tf.reshape(H2_conj,-1),shape=H.shape)
-    # H1_scatter = tf.scatter_nd(gather_idx, tf.reshape(tf.transpose(H_conj,[0,2,3,2]),-1),shape=H.shape)
-    # H2_scatter = tf.scatter_nd(gather_idx, tf.reshape(tf.transpose(H2_conj,[0,2,3,2]),-1),shape=H.shape)
-    H = H1_scatter + H2_scatter
+    H1_scatter = tf.scatter_nd(gather_idx, tf.reshape(H_conj, -1), shape=H.shape)
+    H2_scatter = tf.scatter_nd(gather_idx2, tf.reshape(H2_conj, -1), shape=H.shape)
 
-    # for b in range(batchsize):
-    #
-    #     # # apply J()J to each relative measurement with u < 0
-    #     # gather_idx  = []
-    #     # u_s_gather_idx = []
-    #     # for i in range(N):
-    #     #     for j in range(i + 1, N):
-    #     #         #todo: this is just increasing (range)
-    #     #         u_s_gather_idx.append(pair_dict[(i, j)])
-    #     #         for x in range(3):
-    #     #             for y in range(3):
-    #     #                 gather_idx.append([b, 3 * i + x, 3 * j + y])
-    #     #
-    #     # H_gather = tf.reshape(tf.gather_nd(H, gather_idx), (1, -1, 3, 3))
-    #     # u_s_gather = tf.less(tf.gather(u_s, u_s_gather_idx), 0)
-    #     # #todo: create j mat
-    #     # without_j = tf.repeat(tf.expand_dims(tf.eye(3),axis=0),u_s_gather.shape[0],axis=0)
-    #     # with_j = tf.repeat(tf.expand_dims(tf.linalg.diag((1., 1., -1.)),axis=0),u_s_gather.shape[0],axis=0)
-    #     # # u_s_rs = tf.transpose(tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.cast(u_s_gather,tf.float32),3,axis=-1)),axis=0),3,axis=0))
-    #     # #todo: fix reshape
-    #     # J_mat = tf.transpose(tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.cast(u_s_gather,tf.float32),3,axis=-1)),axis=0),3,axis=0)) * with_j + (1-tf.transpose(tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.cast(u_s_gather,tf.float32),3,axis=-1)),axis=0),3,axis=0))) * without_j
-    #     #
-    #     # # without_j = tf.scatter_nd()
-    #     # # J_mat = without_j # todo:fixme
-    #     # H = tf.scatter_nd(gather_idx, J_mat @ H_gather @ J_mat)
-    #     # u_s = power_iteration(Sigma[b])
-    #     for i in range(N):
-    #         for j in range(i + 1, N):
-    #             # if u_s[pair_dict[(i, j)]] < 0:
-    #             if u_s[b, pair_dict[(i, j)]] < 0:
-    #                 H[b,3 * i:3 * i + 3, 3 * j:3 * j + 3] = J @ H[b,3 * i:3 * i + 3, 3 * j:3 * j + 3] @ J
-    #                 H[b,3 * j:3 * j + 3, 3 * i:3 * i + 3] = J @ H[b,3 * j:3 * j + 3, 3 * i:3 * i + 3] @ J
+    H = H1_scatter + H2_scatter
+    return H
+
+def j_synch_forward(H: np.ndarray):
+    # calc error among different possibilities
+    err_rs = calc_err(H)
+
+    # calc mu
+    mu_ij_opt, mu_jk_opt, mu_ki_opt = calc_mu(err_rs)
+
+    # Build the matrix Sigma
+    Sigma = build_sigma(mu_ij_opt, mu_jk_opt, mu_ki_opt)
+
+    # Unroll PIM
+    u_s = unroll_pim(Sigma, depth=100)
+
+    # Correct J ambiguity
+    H = correct_j_ambiguity(H, u_s)
+
     return H
 
 
@@ -240,6 +226,7 @@ err_with_j_vec =[]
 err_with_j_vec_std =[]
 err_with_j_synch_vec = []
 err_with_j_synch_vec_std = []
+
 
 # ---------------------------------------------------------------------------- #
 # Fixed computation for N and batchsize
@@ -288,6 +275,18 @@ for i in range(N):
 
 # model = BuildModel(int((N - 1) * N / 2),Lambda=1.,DEPTH=100)
 
+gather_idx  = []
+gather_idx2  = []
+u_s_gather_idx = []
+for b in range(batchsize):
+    for i in range(N):
+        for j in range(i + 1, N):
+            #todo: this is just increasing (range)
+            u_s_gather_idx.append([b,pair_dict[(i, j)],0])
+            for x in range(3):
+                for y in range(3):
+                    gather_idx.append([b, 3 * i + x, 3 * j + y])
+                    gather_idx2.append([b, 3 * j + x, 3 * i + y])
 # ---------------------------------------------------------------------------- #
 
 
