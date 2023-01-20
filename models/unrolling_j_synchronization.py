@@ -12,7 +12,6 @@ import pandas as pd
 import time
 
 # tf.config.run_functions_eagerly(True)
-from experiments.j_synchronization import calc_pair_dict
 from models.unrolling_synchronization_z_over_2 import loss_z_over_2
 
 
@@ -82,11 +81,12 @@ class SynchronizationBlock(keras.layers.Layer):
         return x1
 
 class JConfigurationErrorBlock(keras.layers.Layer):
-    def __init__(self, N, global_indices):
+    def __init__(self, N, batchsize, global_indices):
         super(JConfigurationErrorBlock, self).__init__()
         self.learned_eye = tf.Variable(tf.eye(3))
         self.J_block = tf.expand_dims(tf.linalg.diag(tf.tile((1., 1., -1.), [N])), axis=0)
         self.global_indices = global_indices
+        self.batchsize = batchsize
 
     def call(self, H):
         H_j_conj = self.J_block @ H @ self.J_block
@@ -109,19 +109,7 @@ class JConfigurationErrorBlock(keras.layers.Layer):
 
         err = tf.linalg.norm(j_comb - self.learned_eye, axis=[2, 3])
 
-        return tf.reshape(err, (H.shape[0], -1, 8))
-
-class MuBlock(keras.layers.Layer):
-    def __init__(self):
-        super(MuBlock, self).__init__()
-
-    def call(self, err):
-        #todo: replace with MLP
-        min_ind = tf.argmin(err, axis=-1)
-        mu_ij_opt = tf.math.floormod(tf.floor(min_ind / 4), 2)
-        mu_jk_opt = tf.math.floormod(tf.floor(min_ind / 2), 2)
-        mu_ki_opt = tf.math.floormod(min_ind / 1, 2)
-        return mu_ij_opt, mu_jk_opt, mu_ki_opt
+        return tf.reshape(err, (self.batchsize, -1, 8))
 
 
 class SigmaBlock(keras.layers.Layer):
@@ -129,7 +117,13 @@ class SigmaBlock(keras.layers.Layer):
         super(SigmaBlock, self).__init__()
         self.shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
         self.global_indices = global_indices
-    def call(self, mu_ij_opt, mu_jk_opt, mu_ki_opt):
+
+    def call(self, err):
+        #todo: replace with MLP
+        min_ind = tf.argmin(err, axis=-1)
+        mu_ij_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 4), 2),tf.float32)
+        mu_jk_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 2), 2),tf.float32)
+        mu_ki_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 1), 2),tf.float32)
 
         res1 = tf.map_fn(lambda x: tf.scatter_nd(indices=self.global_indices._ij_jk, updates=x, shape=self.shape),
                          tf.pow(-1., mu_ij_opt - mu_jk_opt))
@@ -140,6 +134,7 @@ class SigmaBlock(keras.layers.Layer):
         Sigma = res1 + res2 + res3
         Sigma = Sigma + tf.transpose(Sigma, perm=[0, 2, 1])
         return Sigma
+
 
 class SynchronizationLayer(keras.layers.Layer):
     def __init__(self):
@@ -191,7 +186,14 @@ class IndexGeneration:
         :param batchsize: Number of samples in batch
         :return: None
         """
-        pair_dict = calc_pair_dict(N)
+        pair_dict = {}
+        idx = 0
+        for i in range(N):
+            for j in range(i + 1, N):
+                pair_dict[(i, j)] = idx
+                pair_dict[(j, i)] = idx
+                idx += 1
+
         self._ijs = []
         self._jks = []
         self._kis = []
@@ -250,17 +252,15 @@ def BuildModel(N, DEPTH, batchsize):
 
     global_indices = IndexGeneration(N, batchsize)
 
-    j_configuration_error = JConfigurationErrorBlock(N, global_indices)(Y)
+    j_configuration_error = JConfigurationErrorBlock(N, batchsize, global_indices)(Y)
 
-    mu_ij_opt, mu_jk_opt, mu_ki_opt = MuBlock()(j_configuration_error)
-
-    sigma = SigmaBlock(N, global_indices)(mu_ij_opt, mu_jk_opt, mu_ki_opt)
+    sigma = SigmaBlock(N, global_indices)(j_configuration_error)
 
     v = v_in
 
     # sb = SynchronizationBlock(N)
     for i in range(DEPTH):
-        v_new = SynchronizationLayer(N)(sigma, v)
+        v_new = SynchronizationLayer()(sigma, v)
         v = v_new
 
     # todo: in the next step use this
@@ -274,18 +274,10 @@ def BuildModel(N, DEPTH, batchsize):
     return model
 
 
-def EvaluateModel(model, Y, x, x_init, x_init2):
-    t0 = time.time()
-    x_est = model.predict([x_init, x_init2, Y])
-    prediction_time = time.time() - t0
-    print('NN Forward pass took ', prediction_time, ' seconds for batch size: ', len(Y))
-    #apply projection on x_est
-
-    x_est = project_batch(x_est)
-
-    # loss = loss_so3(x.astype(np.float64), x_est.astype(np.float64))
-    # loss = loss_so3(x, x_est)
-    loss = loss_so3(x.astype(np.float32), x_est.astype(np.float32))
+def EvaluateModel(model, Y, x, x_init):
+    x_est = model.predict([x_init, Y])
+    x_est = tf.math.sign(x_est)
+    loss = loss_z_over_2(x, x_est)
     print('[NN] loss = %lf' % loss)
     return x_est, loss
 
@@ -308,7 +300,7 @@ class CustomCallback(tf.keras.callbacks.Callback):
         keys = list(logs.keys())
         print("End epoch {} of training; got log keys: {}".format(epoch, keys))
 
-def TrainModel(model, Y, x, x_init, x_init2, Y_val,x_val,x_val_init,x_val_init2,epochs):
+def TrainModel(model, Y, x, x_init, x_init2, Y_val,x_val,x_val_init,x_val_init2,epochs, batchsize):
     log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1, write_graph=True,
                                                           write_images=True, profile_batch=0)
@@ -326,8 +318,9 @@ def TrainModel(model, Y, x, x_init, x_init2, Y_val,x_val,x_val_init,x_val_init2,
               epochs=epochs,
               validation_data=([x_val_init,x_val_init2, Y_val], x_val.astype(np.float32)),
               # validation_freq=20,
-              callbacks=[tensorboard_callback, model_checkpoint_callback, CustomCallback(log_dir)],
-              batch_size=128)
+              # callbacks=[tensorboard_callback, model_checkpoint_callback, CustomCallback(log_dir)],
+              callbacks=[tensorboard_callback, model_checkpoint_callback],
+              batch_size=batchsize)
               # batch_size=5000)
 
     # The model weights (that are considered the best) are loaded into the model.
