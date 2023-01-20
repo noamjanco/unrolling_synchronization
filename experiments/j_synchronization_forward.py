@@ -170,9 +170,9 @@ def correct_j_ambiguity(H: tf.Tensor, u_s: tf.Tensor) -> tf.Tensor:
     :param u_s: Estimated eigenvector of Sigma, indicates which pair contains J ambiguity
     :return: H without J ambiguity
     """
-    u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, u_s_gather_idx), 0), (batchsize, -1)), tf.float32)
-    H_gather = tf.reshape(tf.gather_nd(H, gather_idx), (batchsize, -1, 3, 3))
-    H_gather2 = tf.reshape(tf.gather_nd(H, gather_idx2), (batchsize, -1, 3, 3))
+    u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, u_s_gather_idx), 0), (H.shape[0], -1)), tf.float32)
+    H_gather = tf.reshape(tf.gather_nd(H, gather_idx), (H.shape[0], -1, 3, 3))
+    H_gather2 = tf.reshape(tf.gather_nd(H, gather_idx2), (H.shape[0], -1, 3, 3))
     without_j = tf.repeat(
         tf.expand_dims(tf.repeat(tf.expand_dims(tf.eye(3), axis=0), u_s_gather.shape[1], axis=0), axis=0),
         u_s_gather.shape[0], axis=0)
@@ -211,6 +211,65 @@ def j_synch_forward(H: np.ndarray):
 
     return H
 
+def global_index_generation(N, batchsize) -> None:
+    """
+    Generate global indices used for gather / scatter operations
+    :param N: Number of relative rotations
+    :param batchsize: Number of samples in batch
+    :return: None
+    """
+    global _ijs, _jks, _kis, _ij_jk, _jk_ki, _ki_ij
+    global ijs, jks, kis
+    global gather_idx, gather_idx2, u_s_gather_idx
+
+    pair_dict = calc_pair_dict(N)
+    _ijs = []
+    _jks = []
+    _kis = []
+    _ij_jk = []
+    _jk_ki = []
+    _ki_ij = []
+    indices = []
+    for i in range(N):
+        for j in range(i + 1, N):
+            for k in range(j + 1, N):
+                _ijs.append(pair_dict[(i, j)])
+                _jks.append(pair_dict[(j, k)])
+                _kis.append(pair_dict[(k, i)])
+                _ij_jk.append((_ijs[-1], _jks[-1]))
+                _jk_ki.append((_jks[-1], _kis[-1]))
+                _ki_ij.append((_kis[-1], _ijs[-1]))
+                indices.append((i, j, k))
+
+    ijs = []
+    jks = []
+    kis = []
+    for b in range(batchsize):
+        for i, idx in enumerate(indices):
+            for x in range(3):
+                for y in range(3):
+                    ijs.append([b, 3 * idx[0] + x, 3 * idx[1] + y])
+                    jks.append([b, 3 * idx[1] + x, 3 * idx[2] + y])
+                    kis.append([b, 3 * idx[2] + x, 3 * idx[0] + y])
+
+    ijs = tf.constant(np.asarray(ijs))
+    jks = tf.constant(np.asarray(jks))
+    kis = tf.constant(np.asarray(kis))
+
+    # model = BuildModel(int((N - 1) * N / 2),Lambda=1.,DEPTH=100)
+
+    gather_idx = []
+    gather_idx2 = []
+    u_s_gather_idx = []
+    for b in range(batchsize):
+        for i in range(N):
+            for j in range(i + 1, N):
+                # todo: this is just increasing (range)
+                u_s_gather_idx.append([b, pair_dict[(i, j)], 0])
+                for x in range(3):
+                    for y in range(3):
+                        gather_idx.append([b, 3 * i + x, 3 * j + y])
+                        gather_idx2.append([b, 3 * j + x, 3 * i + y])
 
 np.random.seed(1)
 # Lambda = 3
@@ -235,64 +294,7 @@ err_with_j_synch_vec_std = []
 
 
 # ---------------------------------------------------------------------------- #
-# Fixed computation for N and batchsize
-batchsize = R
-pair_dict = calc_pair_dict(N)
-_ijs = []
-_jks = []
-_kis = []
-indices = []
-for i in range(N):
-    for j in range(i + 1, N):
-        for k in range(j + 1, N):
-            _ijs.append(pair_dict[(i, j)])
-            _jks.append(pair_dict[(j, k)])
-            _kis.append(pair_dict[(k, i)])
-            indices.append((i, j, k))
-
-_ij_jk = []
-_jk_ki = []
-_ki_ij = []
-for i in range(len(_ijs)):
-    _ij_jk.append((_ijs[i], _jks[i]))
-    _jk_ki.append((_jks[i], _kis[i]))
-    _ki_ij.append((_kis[i], _ijs[i]))
-
-ijs = []
-jks = []
-kis = []
-for b in range(batchsize):
-    for i, idx in enumerate(indices):
-        for x in range(3):
-            for y in range(3):
-                ijs.append([b, 3 * idx[0] + x, 3 * idx[1] + y])
-                jks.append([b, 3 * idx[1] + x, 3 * idx[2] + y])
-                kis.append([b, 3 * idx[2] + x, 3 * idx[0] + y])
-
-
-ijs = tf.constant(np.asarray(ijs))
-jks = tf.constant(np.asarray(jks))
-kis = tf.constant(np.asarray(kis))
-
-__ijs = []
-for i in range(N):
-    for j in range(i + 1, N):
-        __ijs.append(pair_dict[(i, j)])
-
-# model = BuildModel(int((N - 1) * N / 2),Lambda=1.,DEPTH=100)
-
-gather_idx  = []
-gather_idx2  = []
-u_s_gather_idx = []
-for b in range(batchsize):
-    for i in range(N):
-        for j in range(i + 1, N):
-            #todo: this is just increasing (range)
-            u_s_gather_idx.append([b,pair_dict[(i, j)],0])
-            for x in range(3):
-                for y in range(3):
-                    gather_idx.append([b, 3 * i + x, 3 * j + y])
-                    gather_idx2.append([b, 3 * j + x, 3 * i + y])
+global_index_generation(N, R)
 # ---------------------------------------------------------------------------- #
 
 
