@@ -88,6 +88,11 @@ def calc_pair_dict(N):
     return d
 
 def calc_err(H) -> tf.Tensor:
+    """
+    Calc error vector for each triplet
+    :param H: relative rotation matrix of size (batch_size, 3*N, 3*N)
+    :return: Error vector for each combination of J conjugation, for each triplet, of size (batch_size, num_triplets, 8)
+    """
     N = int(H.shape[1]/3)
     batchsize = H.shape[0]
     J_block = tf.expand_dims(tf.linalg.diag(tf.tile((1., 1., -1.), [N])), axis=0)
@@ -115,6 +120,7 @@ def calc_err(H) -> tf.Tensor:
     return err_rs
 
 def calc_mu(err_rs: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
+    """ Calculate mu for each pair based on the error"""
     min_ind = tf.argmin(err_rs, axis=-1)
     mu_ij_opt = tf.math.floormod(tf.floor(min_ind / 4), 2)
     mu_jk_opt = tf.math.floormod(tf.floor(min_ind / 2), 2)
