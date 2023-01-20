@@ -106,18 +106,18 @@ def calc_err(H) -> tf.Tensor:
     H_ki = tf.reshape(tf.gather_nd(H, kis), (-1, 3, 3))
     H_ki_j_conj = tf.reshape(tf.gather_nd(H_j_conj, kis), (-1, 3, 3))
 
-    err0 = tf.linalg.norm(H_ij @ H_jk @ H_ki - tf.eye(3), axis=[1, 2])
-    err1 = tf.linalg.norm(H_ij @ H_jk @ H_ki_j_conj - tf.eye(3), axis=[1, 2])
-    err2 = tf.linalg.norm(H_ij @ H_jk_j_conj @ H_ki - tf.eye(3), axis=[1, 2])
-    err3 = tf.linalg.norm(H_ij @ H_jk_j_conj @ H_ki_j_conj - tf.eye(3), axis=[1, 2])
-    err4 = tf.linalg.norm(H_ij_j_conj @ H_jk @ H_ki - tf.eye(3), axis=[1, 2])
-    err5 = tf.linalg.norm(H_ij_j_conj @ H_jk @ H_ki_j_conj - tf.eye(3), axis=[1, 2])
-    err6 = tf.linalg.norm(H_ij_j_conj @ H_jk_j_conj @ H_ki - tf.eye(3), axis=[1, 2])
-    err7 = tf.linalg.norm(H_ij_j_conj @ H_jk_j_conj @ H_ki_j_conj - tf.eye(3), axis=[1, 2])
+    j_comb = tf.stack([H_ij @ H_jk @ H_ki,
+                       H_ij @ H_jk @ H_ki_j_conj,
+                       H_ij @ H_jk_j_conj @ H_ki,
+                       H_ij @ H_jk_j_conj @ H_ki_j_conj,
+                       H_ij_j_conj @ H_jk @ H_ki,
+                       H_ij_j_conj @ H_jk @ H_ki_j_conj,
+                       H_ij_j_conj @ H_jk_j_conj @ H_ki,
+                       H_ij_j_conj @ H_jk_j_conj @ H_ki_j_conj], axis=1)
 
-    err = tf.stack([err0, err1, err2, err3, err4, err5, err6, err7], axis=-1)
-    err_rs = tf.reshape(err, (batchsize, -1, 8))
-    return err_rs
+    err = tf.linalg.norm(j_comb - tf.eye(3), axis=[2,3])
+
+    return tf.reshape(err, (batchsize, -1, 8))
 
 def calc_mu(err_rs: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
     """ Calculate mu for each pair based on the error"""
