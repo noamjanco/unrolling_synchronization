@@ -1,52 +1,10 @@
 from common.math_utils import rel_error_so3
 from data_generation.generate_data_so3 import generate_data_so3, apply_j
-from models.unrolling_synchronization_z_over_2 import loss_z_over_2
 from synchronization.pim import pim_so3
 import numpy as np
 import tqdm
-import time
 import matplotlib.pyplot as plt
 import tensorflow as tf
-import keras
-
-from keras.layers import Dense
-from keras import Model
-
-class PIMBlock(keras.layers.Layer):
-    def __init__(self, Lambda, N):
-        super(PIMBlock, self).__init__()
-        self.Lambda = Lambda
-        self.N = N
-
-    def call(self, Y, x, x_prev, x_prev_prev):
-        x1 = tf.matmul(Y, x)
-        x_new = tf.divide(x1,(tf.sqrt(tf.reduce_sum(tf.pow(x1, 2), axis=-1, keepdims=True))))
-
-        return x_new
-
-
-def BuildModel(N, Lambda, DEPTH):
-    v_in = keras.layers.Input((N, 1))
-    v_in2 = keras.layers.Input((N, 1))
-    Y = keras.layers.Input((N, N))
-
-    v = v_in
-    v_prev = v_in2
-    v_prev_prev = v_in
-    v_new = []
-
-    for i in range(DEPTH):
-        v_new = PIMBlock(Lambda, N)(Y, v, v_prev, v_prev_prev)
-        v_prev_prev = v_prev
-        v_prev = v
-        v = v_new
-
-    model = Model(inputs=[v_in, v_in2, Y], outputs=v_new)
-    opt = keras.optimizers.Adam(learning_rate=0.001)  # working 18:07
-    # opt = keras.optimizers.Adam(learning_rate=0.01) # working 18:07
-    model.compile(optimizer=opt, loss=loss_z_over_2)
-    model.summary()
-    return model
 
 
 def plot_with_confidence(x,y,std, label, fig, ax):
@@ -152,8 +110,7 @@ def unroll_pim(sigma: tf.Tensor, depth: int = 100) -> tf.Tensor:
     :param depth: how many iterations to unroll
     :return: Eigenvector of Sigma
     """
-    # u_s = model.predict([np.asarray(x_init,dtype=np.float64), np.asarray(x_init,dtype=np.float64), np.asarray(Sigma,dtype=np.float64)])
-    x_init = 1e-3*np.expand_dims(np.ones((sigma.shape[0],sigma.shape[1])),axis=-1)
+    x_init = 1e-3*tf.expand_dims(tf.ones((sigma.shape[0],sigma.shape[1]),dtype=tf.float64),axis=-1)
     v = x_init
     for i in range(depth):
         v_new = sigma @ v
@@ -253,8 +210,6 @@ def global_index_generation(N, batchsize) -> None:
     ijs = tf.constant(np.asarray(ijs))
     jks = tf.constant(np.asarray(jks))
     kis = tf.constant(np.asarray(kis))
-
-    # model = BuildModel(int((N - 1) * N / 2),Lambda=1.,DEPTH=100)
 
     gather_idx = []
     gather_idx2 = []
