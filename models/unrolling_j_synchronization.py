@@ -15,70 +15,70 @@ import time
 from models.unrolling_synchronization_z_over_2 import loss_z_over_2
 
 
-class ProjectionBlock(keras.layers.Layer):
-    def __init__(self, hidden_size=32, hidden_layers=1):
-        super(ProjectionBlock, self).__init__()
-        self.hidden_size = hidden_size
-        self.hidden_layers = hidden_layers
-        self.dense_layers = [Dense(self.hidden_size) for _ in range(self.hidden_layers)]
-        self.bns = [keras.layers.BatchNormalization() for _ in range(self.hidden_layers)]
-        self.output_layer = Dense(9)
-        self.input_layer = Dense(128)
-        self.input_bn = keras.layers.BatchNormalization()
-        self.output_bn = keras.layers.BatchNormalization()
+# class ProjectionBlock(keras.layers.Layer):
+#     def __init__(self, hidden_size=32, hidden_layers=1):
+#         super(ProjectionBlock, self).__init__()
+#         self.hidden_size = hidden_size
+#         self.hidden_layers = hidden_layers
+#         self.dense_layers = [Dense(self.hidden_size) for _ in range(self.hidden_layers)]
+#         self.bns = [keras.layers.BatchNormalization() for _ in range(self.hidden_layers)]
+#         self.output_layer = Dense(9)
+#         self.input_layer = Dense(128)
+#         self.input_bn = keras.layers.BatchNormalization()
+#         self.output_bn = keras.layers.BatchNormalization()
+#
+#
+#     def call(self, x):
+#         x_reshaped = tf.reshape(x, [-1,9])
+#         y = x_reshaped
+#         y_prev = y
+#
+#         for i in range(self.hidden_layers):
+#             y = self.dense_layers[i](y)
+#             y = self.bns[i](y)
+#             y = keras.activations.relu(y)
+#             y_prev = y
+#         y = self.output_layer(y)
+#         y = self.output_bn(y)
+#         y = keras.activations.tanh(y)
+#
+#         y = tf.reshape(y, tf.shape(x))
+#
+#         return y
+
+# class StrictProjectionBlock(keras.layers.Layer):
+#     def __init__(self, num_layers=4):
+#         super(StrictProjectionBlock, self).__init__()
+#         self.num_layers = num_layers
+#
+#     def call(self, x):
+#         x_reshaped = tf.reshape(x, [-1,3,3])
+#         norm = tf.sqrt(tf.reduce_sum(tf.pow(x_reshaped, 2), axis=[1, 2], keepdims=True))
+#         x_reshaped = x_reshaped / norm
+#
+#         Q = x_reshaped
+#         for i in range(self.num_layers):
+#             N = tf.matmul(tf.transpose(Q, perm=[0, 2, 1]), Q)
+#             P = 1 / 2 * tf.matmul(Q, N)
+#             Q = 2 * Q + tf.matmul(P, N) - 3 * P
+#
+#         Q_reshaped = tf.reshape(Q, tf.shape(x))
+#         return Q_reshaped
 
 
-    def call(self, x):
-        x_reshaped = tf.reshape(x, [-1,9])
-        y = x_reshaped
-        y_prev = y
-
-        for i in range(self.hidden_layers):
-            y = self.dense_layers[i](y)
-            y = self.bns[i](y)
-            y = keras.activations.relu(y)
-            y_prev = y
-        y = self.output_layer(y)
-        y = self.output_bn(y)
-        y = keras.activations.tanh(y)
-
-        y = tf.reshape(y, tf.shape(x))
-
-        return y
-
-class StrictProjectionBlock(keras.layers.Layer):
-    def __init__(self, num_layers=4):
-        super(StrictProjectionBlock, self).__init__()
-        self.num_layers = num_layers
-
-    def call(self, x):
-        x_reshaped = tf.reshape(x, [-1,3,3])
-        norm = tf.sqrt(tf.reduce_sum(tf.pow(x_reshaped, 2), axis=[1, 2], keepdims=True))
-        x_reshaped = x_reshaped / norm
-
-        Q = x_reshaped
-        for i in range(self.num_layers):
-            N = tf.matmul(tf.transpose(Q, perm=[0, 2, 1]), Q)
-            P = 1 / 2 * tf.matmul(Q, N)
-            Q = 2 * Q + tf.matmul(P, N) - 3 * P
-
-        Q_reshaped = tf.reshape(Q, tf.shape(x))
-        return Q_reshaped
-
-
-class SynchronizationBlock(keras.layers.Layer):
-    def __init__(self, N):
-        super(SynchronizationBlock, self).__init__()
-        self.N = N
-        self.project_block = ProjectionBlock(hidden_size=32, hidden_layers=1) # last best
-        self.project_block2 = ProjectionBlock(hidden_size=9, hidden_layers=1) # last best
-
-    def call(self, Y, x, x_prev):
-        x1 = tf.matmul(Y, x)
-        x1 = self.project_block(x1)
-        x1 = x1 + self.project_block2(x_prev)
-        #todo: use x_prev
-        return x1
+# class SynchronizationBlock(keras.layers.Layer):
+#     def __init__(self, N):
+#         super(SynchronizationBlock, self).__init__()
+#         self.N = N
+#         self.project_block = ProjectionBlock(hidden_size=32, hidden_layers=1) # last best
+#         self.project_block2 = ProjectionBlock(hidden_size=9, hidden_layers=1) # last best
+#
+#     def call(self, Y, x, x_prev):
+#         x1 = tf.matmul(Y, x)
+#         x1 = self.project_block(x1)
+#         x1 = x1 + self.project_block2(x_prev)
+#         #todo: use x_prev
+#         return x1
 
 class JConfigurationErrorBlock(keras.layers.Layer):
     def __init__(self, N, batchsize, global_indices):
@@ -142,7 +142,7 @@ class SynchronizationLayer(keras.layers.Layer):
 
     def call(self, Y, x):
         x1 = tf.matmul(Y, x)
-        x_new = tf.divide(x1,(tf.sqrt(tf.reduce_sum(tf.pow(x1, 2), axis=-1, keepdims=True))))
+        x_new = tf.divide(x1,(tf.sqrt(tf.reduce_sum(tf.pow(x1, 2), axis=-1, keepdims=True)))+1e-8)
 
         return x_new
 
@@ -240,10 +240,10 @@ class IndexGeneration:
                             self.gather_idx.append([b, 3 * i + x, 3 * j + y])
                             self.gather_idx2.append([b, 3 * j + x, 3 * i + y])
 
-def loss_so3(y_true,y_pred):
-    loss = 1 - tf.reduce_mean(tf.reduce_sum(tf.reduce_sum(tf.math.pow(tf.matmul(tf.transpose(y_true,perm=[0, 2, 1]),y_pred),2),axis=2),axis=1)/(y_true.shape[1]/3 * np.sqrt(3))**2)
-
-    return loss
+# def loss_so3(y_true,y_pred):
+#     loss = 1 - tf.reduce_mean(tf.reduce_sum(tf.reduce_sum(tf.math.pow(tf.matmul(tf.transpose(y_true,perm=[0, 2, 1]),y_pred),2),axis=2),axis=1)/(y_true.shape[1]/3 * np.sqrt(3))**2)
+#
+#     return loss
 
 def BuildModel(N, DEPTH, batchsize):
     v_in = keras.layers.Input((int((N - 1) * N / 2), 1))
@@ -258,10 +258,11 @@ def BuildModel(N, DEPTH, batchsize):
 
     v = v_in
 
-    # sb = SynchronizationBlock(N)
     for i in range(DEPTH):
         v_new = SynchronizationLayer()(sigma, v)
         v = v_new
+
+    # v = sigma @ v
 
     # todo: in the next step use this
     # V_without_j_conj = CorrectJAmbiguityBlock(global_indices)(V, v)
@@ -274,12 +275,12 @@ def BuildModel(N, DEPTH, batchsize):
     return model
 
 
-def EvaluateModel(model, Y, x, x_init):
-    x_est = model.predict([x_init, Y])
-    x_est = tf.math.sign(x_est)
-    loss = loss_z_over_2(x, x_est)
+def EvaluateModel(model, H, j_gt, j_init):
+    j_est = model.predict([j_init, H])
+    j_est = tf.math.sign(j_est)
+    loss = loss_z_over_2(j_gt, j_est)
     print('[NN] loss = %lf' % loss)
-    return x_est, loss
+    return j_est, loss
 
 
 class CustomCallback(tf.keras.callbacks.Callback):

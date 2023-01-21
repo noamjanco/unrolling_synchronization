@@ -51,7 +51,8 @@ def calc_err(H) -> tf.Tensor:
     :param H: relative rotation matrix of size (batch_size, 3*N, 3*N)
     :return: Error vector for each combination of J conjugation, for each triplet, of size (batch_size, num_triplets, 8)
     """
-    J_block = tf.expand_dims(tf.linalg.diag(tf.tile((1., 1., -1.), [int(H.shape[1]/3)])), axis=0)
+    J_block = tf.cast(tf.expand_dims(tf.linalg.diag(tf.tile((1., 1., -1.),
+                                                            [int(H.shape[1]/3)])), axis=0),H.dtype)
 
     H_j_conj = J_block @ H @ J_block
 
@@ -71,7 +72,7 @@ def calc_err(H) -> tf.Tensor:
                        H_ij_j_conj @ H_jk_j_conj @ H_ki,
                        H_ij_j_conj @ H_jk_j_conj @ H_ki_j_conj], axis=1)
 
-    err = tf.linalg.norm(j_comb - tf.eye(3), axis=[2,3])
+    err = tf.linalg.norm(j_comb - tf.eye(3, dtype=H.dtype), axis=[2,3])
 
     return tf.reshape(err, (H.shape[0], -1, 8))
 
@@ -83,7 +84,7 @@ def calc_mu(err_rs: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
     mu_ki_opt = tf.math.floormod(min_ind / 1, 2)
     return mu_ij_opt, mu_jk_opt, mu_ki_opt
 
-def build_sigma(mu_ij_opt: tf.Tensor, mu_jk_opt: tf.Tensor, mu_ki_opt: tf.Tensor) -> tf.Tensor:
+def build_sigma(mu_ij_opt: tf.Tensor, mu_jk_opt: tf.Tensor, mu_ki_opt: tf.Tensor, N: int) -> tf.Tensor:
     """
     Build the matrix sigma from mu_ij_opt, mu_jk_opt, mu_ki_opt
     :param mu_ij_opt:
@@ -125,14 +126,14 @@ def correct_j_ambiguity(H: tf.Tensor, u_s: tf.Tensor) -> tf.Tensor:
     :param u_s: Estimated eigenvector of Sigma, indicates which pair contains J ambiguity
     :return: H without J ambiguity
     """
-    u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, u_s_gather_idx), 0), (H.shape[0], -1)), tf.float32)
+    u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, u_s_gather_idx), 0), (H.shape[0], -1)), H.dtype)
     H_gather = tf.reshape(tf.gather_nd(H, gather_idx), (H.shape[0], -1, 3, 3))
     H_gather2 = tf.reshape(tf.gather_nd(H, gather_idx2), (H.shape[0], -1, 3, 3))
     without_j = tf.repeat(
-        tf.expand_dims(tf.repeat(tf.expand_dims(tf.eye(3), axis=0), u_s_gather.shape[1], axis=0), axis=0),
+        tf.expand_dims(tf.repeat(tf.expand_dims(tf.eye(3, dtype=H.dtype), axis=0), u_s_gather.shape[1], axis=0), axis=0),
         u_s_gather.shape[0], axis=0)
     with_j = tf.repeat(
-        tf.expand_dims(tf.repeat(tf.expand_dims(tf.linalg.diag((1., 1., -1.)), axis=0), u_s_gather.shape[1], axis=0),
+        tf.expand_dims(tf.repeat(tf.expand_dims(tf.cast(tf.linalg.diag((1., 1., -1.)), dtype=H.dtype), axis=0), u_s_gather.shape[1], axis=0),
                        axis=0), u_s_gather.shape[0], axis=0)
     indicator = tf.transpose(
         tf.repeat(tf.expand_dims(tf.transpose(tf.repeat(tf.expand_dims(u_s_gather, axis=-1), 3, axis=-1)), axis=0), 3,
@@ -149,6 +150,9 @@ def correct_j_ambiguity(H: tf.Tensor, u_s: tf.Tensor) -> tf.Tensor:
     return H
 
 def j_synch_forward(H: np.ndarray):
+    N = int(H.shape[1]/3)
+    global_index_generation(N, H.shape[0])
+
     # calc error among different possibilities
     err_rs = calc_err(H)
 
@@ -156,7 +160,7 @@ def j_synch_forward(H: np.ndarray):
     mu_ij_opt, mu_jk_opt, mu_ki_opt = calc_mu(err_rs)
 
     # Build the matrix Sigma
-    Sigma = build_sigma(mu_ij_opt, mu_jk_opt, mu_ki_opt)
+    Sigma = build_sigma(mu_ij_opt, mu_jk_opt, mu_ki_opt, N)
 
     # Unroll PIM
     u_s = unroll_pim(Sigma, depth=100)
@@ -164,7 +168,7 @@ def j_synch_forward(H: np.ndarray):
     # Correct J ambiguity
     H = correct_j_ambiguity(H, u_s)
 
-    return H, u_s
+    return H, tf.sign(u_s)
 
 def global_index_generation(N, batchsize) -> None:
     """
