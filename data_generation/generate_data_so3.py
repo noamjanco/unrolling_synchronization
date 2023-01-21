@@ -16,19 +16,21 @@ def apply_j(H: np.ndarray, p : float = 0.5) -> (np.ndarray, dict):
     :param p: Probability of a pair with inverse handedness.
     :return: a tuple that consist of:
             1. The relative rotation matrix with J ambiguity
-            2. A dictionary where the keys indicate whether a relative rotation has inverse handedness.
+            2. A vector where -1 indicate whether a relative rotation has inverse handedness.
     """
     J = np.diag((1,1,-1))
     N = int(H.shape[0] / 3)
-    d = {}
+    j_gt = np.ones((int((N - 1) * N / 2),1))
     H_j_ambiguity = np.copy(H)
+    idx = 0
     for i in range(N):
         for j in range(i+1,N):
             if np.random.rand() < p:
-                d[(i,j)] = 1
+                j_gt[idx] = -1
                 H_j_ambiguity[3 * i:3 * i + 3, 3 * j:3 * j + 3] = J @ H[3 * i:3 * i + 3, 3 * j:3 * j + 3] @ J
                 H_j_ambiguity[3 * j:3 * j + 3, 3 * i:3 * i + 3] = J @ H[3 * j:3 * j + 3, 3 * i:3 * i + 3] @ J
-    return H_j_ambiguity, d
+            idx += 1
+    return H_j_ambiguity, j_gt
 
 
 def generate_data_so3(N: int, Lambda: float) -> [List[np.ndarray], np.ndarray]:
@@ -79,23 +81,21 @@ def generate_training_data_so3(N: int, Lambda: float, R: int) -> [np.ndarray, np
 def generate_training_data_so3_with_j_ambiguity(N: int, Lambda: float, R: int) -> [np.ndarray, np.ndarray]:
     Rot_total = []
     H_total = []
+    j_gt_total = []
     for r in range(R):
         Rot_mat, H  = generate_data_so3(N, Lambda)
 
-        H, _ = apply_j(H, p=0.5)
-
-        # #todo: Return Rot_mat inside generate data so3
-        # Rot_mat = np.zeros((3 * N, 3))
-        # for i in range(N):
-        #     Rot_mat[3 * i:3 * i + 3, :] = Rot[i]
+        H, j_gt = apply_j(H, p=0.5)
 
         Rot_total.append(Rot_mat)
         H_total.append(H)
+        j_gt_total.append(j_gt)
 
     Rot_total = np.asarray(Rot_total)
     H_total = np.asarray(H_total)
+    j_gt_total = np.asarray(j_gt_total)
 
-    return Rot_total, H_total
+    return Rot_total, H_total, j_gt_total
 
 
 if __name__ == '__main__':
