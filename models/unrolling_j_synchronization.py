@@ -83,7 +83,8 @@ from models.unrolling_synchronization_z_over_2 import loss_z_over_2
 class JConfigurationErrorBlock(keras.layers.Layer):
     def __init__(self, N, batchsize, global_indices):
         super(JConfigurationErrorBlock, self).__init__()
-        self.learned_eye = tf.Variable(tf.eye(3))
+        self.learned_eye = tf.Variable(tf.eye(3),trainable=False)
+        # self.learned_eye = tf.eye(3)
         self.J_block = tf.expand_dims(tf.linalg.diag(tf.tile((1., 1., -1.), [N])), axis=0)
         self.global_indices = global_indices
         self.batchsize = batchsize
@@ -118,6 +119,7 @@ class JConfigurationErrorBlock(keras.layers.Layer):
                            H_ij_j_conj @ H_jk_j_conj @ H_ki_j_conj], axis=1)
 
         err = tf.linalg.norm(j_comb - self.learned_eye, axis=[2, 3])
+        # err = tf.reduce_sum(tf.pow(j_comb - self.learned_eye,2), axis=[2, 3])
 
         return tf.reshape(err, (self.batchsize, -1, 8))
 
@@ -128,12 +130,12 @@ class SigmaBlock(keras.layers.Layer):
         self.shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
         self.global_indices = global_indices
         self.N = N
-        stddev = 3
-        self.hidden_1 = Dense(64, activation='relu',kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
-        self.hidden_2 = Dense(8, activation='relu',kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
-        self.dense_1 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
-        self.dense_2 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
-        self.dense_3 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        stddev = 5
+        self.hidden_1 = Dense(256, activation='relu',kernel_initializer=tf.keras.initializers.ones())
+        # self.hidden_2 = Dense(8, activation='relu',kernel_initializer=tf.keras.initializers.ones())
+        self.dense_1 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.ones())
+        self.dense_2 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.ones())
+        self.dense_3 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.ones())
 
     def get_config(self):
         config = super().get_config()
@@ -153,8 +155,8 @@ class SigmaBlock(keras.layers.Layer):
         # d2 = mu_jk_opt - mu_ki_opt
         # d3 = mu_ki_opt - mu_ij_opt
 
-        hidden_1 = self.hidden_1(err)
-        hidden_2 = self.hidden_2(hidden_1)
+        hidden_2 = self.hidden_1(err)
+        # hidden_2 = self.hidden_2(hidden_1)
         d1 = tf.squeeze(self.dense_1(hidden_2),axis=-1)
         d2 = tf.squeeze(self.dense_2(hidden_2),axis=-1)
         d3 = tf.squeeze(self.dense_3(hidden_2),axis=-1)
@@ -177,8 +179,8 @@ class SynchronizationLayer(keras.layers.Layer):
     def call(self, Y, x):
         x1 = tf.matmul(Y, x)
         # x_new = tf.divide(x1,(tf.sqrt(tf.reduce_sum(tf.pow(x1, 2), axis=-1, keepdims=True)))+1e-8)
-        # x_new = tf.divide(x1,tf.expand_dims(tf.linalg.norm(x1,axis=1),axis=-1))
         x_new = tf.divide(x1,tf.expand_dims(tf.linalg.norm(x1,axis=1),axis=-1))
+        # x_new = tf.divide(x1,tf.expand_dims(tf.linalg.norm(x1,axis=1)+1e-1,axis=-1))
 
         return x_new
 
@@ -196,7 +198,7 @@ class CorrectJAmbiguityBlock(keras.layers.Layer):
         return config
 
     def call(self, H, u_s):
-        u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, self.global_indices.u_s_gather_idx), 0), (H.shape[0], -1)), tf.float32)
+        u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, self.global_indices.u_s_gather_idx), 0), (H.shape[0], -1)), H.dtype)
         H_gather = tf.reshape(tf.gather_nd(H, self.global_indices.gather_idx), (H.shape[0], -1, 3, 3))
         H_gather2 = tf.reshape(tf.gather_nd(H, self.global_indices.gather_idx2), (H.shape[0], -1, 3, 3))
         without_j = tf.repeat(
@@ -317,14 +319,14 @@ def BuildModel(N, DEPTH, batchsize):
         v_new = SynchronizationLayer()(sigma, v)
         v = v_new
 
-    # v = sigma @ v
+    v = tf.sign(v)
 
     # todo: in the next step use this
     # V_without_j_conj = CorrectJAmbiguityBlock(global_indices)(V, v)
 
     model = Model(inputs=[v_in, Y], outputs=v)
 
-    opt = keras.optimizers.Adam(learning_rate=0.0001)
+    opt = keras.optimizers.Adam(learning_rate=0.00001)
     model.compile(optimizer=opt, loss=loss_z_over_2)
     model.summary()
     return model
@@ -380,4 +382,4 @@ def TrainModel(model, Y, j_gt, j_init, Y_val, j_gt_val, j_init_val, epochs, batc
               # batch_size=5000)
 
     # The model weights (that are considered the best) are loaded into the model.
-    model.load_weights(checkpoint_filepath)
+    # model.load_weights(checkpoint_filepath)
