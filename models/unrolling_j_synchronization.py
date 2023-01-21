@@ -128,9 +128,9 @@ class SigmaBlock(keras.layers.Layer):
         self.shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
         self.global_indices = global_indices
         self.N = N
-        self.dense_1 = Dense(1, activation='tanh')
-        self.dense_2 = Dense(1, activation='tanh')
-        self.dense_3 = Dense(1, activation='tanh')
+        self.dense_1 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.ones())
+        self.dense_2 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.ones())
+        self.dense_3 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.ones())
 
     def get_config(self):
         config = super().get_config()
