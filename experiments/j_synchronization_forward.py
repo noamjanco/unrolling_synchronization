@@ -164,7 +164,7 @@ def j_synch_forward(H: np.ndarray):
     # Correct J ambiguity
     H = correct_j_ambiguity(H, u_s)
 
-    return H
+    return H, u_s
 
 def global_index_generation(N, batchsize) -> None:
     """
@@ -224,82 +224,84 @@ def global_index_generation(N, batchsize) -> None:
                         gather_idx.append([b, 3 * i + x, 3 * j + y])
                         gather_idx2.append([b, 3 * j + x, 3 * i + y])
 
-np.random.seed(1)
-# Lambda = 3
-# N = 50
-# Lambda_range = np.arange(1,10,1)
-N = 20
-R = 5
-# Lambda_range = np.arange(1,9,2)
-Lambda_range = np.arange(1,9,2)
-# Lambda_range = [3.]
-# Lambda_range = [9.]
-# Lambda_range = [10]
-err_no_j_acc = []
-err_with_j_acc = []
-err_with_j_synch_acc = []
-err_no_j_vec = []
-err_no_j_vec_std = []
-err_with_j_vec =[]
-err_with_j_vec_std =[]
-err_with_j_synch_vec = []
-err_with_j_synch_vec_std = []
 
 
-# ---------------------------------------------------------------------------- #
-global_index_generation(N, R)
-# ---------------------------------------------------------------------------- #
-
-
-for Lambda in tqdm.tqdm(Lambda_range):
+if __name__ == '__main__':
+    np.random.seed(1)
+    # Lambda = 3
+    # N = 50
+    # Lambda_range = np.arange(1,10,1)
+    N = 20
+    R = 5
+    # Lambda_range = np.arange(1,9,2)
+    Lambda_range = np.arange(1, 9, 2)
+    # Lambda_range = [3.]
+    # Lambda_range = [9.]
+    # Lambda_range = [10]
     err_no_j_acc = []
     err_with_j_acc = []
     err_with_j_synch_acc = []
-    H_list = []
-    Rot_list = []
-    for r in range(R):
-        # generate samples according to R_ij = {R_i^T R_j, J R_i^TR_jJ}, where J=diag(1,1,-1)
-        Rot, H = generate_data_so3(N, Lambda)
-        # H = H * N / Lambda
-        # err with no J conj
-        Rot_est = pim_so3(H)
-        Rot_est = np.real(Rot_est)
-        err_no_j = j_conj_err(Rot_est, Rot)
-        err_no_j_acc.append(err_no_j)
-        H, J_conj_dict = apply_j(H, p=0.5)
+    err_no_j_vec = []
+    err_no_j_vec_std = []
+    err_with_j_vec = []
+    err_with_j_vec_std = []
+    err_with_j_synch_vec = []
+    err_with_j_synch_vec_std = []
 
-        # err with J conj without J-synch
-        Rot_est = pim_so3(H)
-        Rot_est = np.real(Rot_est)
-        err_with_j = j_conj_err(Rot_est, Rot)
-        err_with_j_acc.append(err_with_j)
+    # ---------------------------------------------------------------------------- #
+    global_index_generation(N, R)
+    # ---------------------------------------------------------------------------- #
 
-        # error with J conj and J-synch
-        # H = j_synchronization(H, J_conj_dict, N, Lambda)
-        H_list.append(np.asarray(H,np.float32))
-        Rot_list.append(Rot)
 
-    H_new = j_synch_forward(np.asarray(H_list))
-    for r in range(R):
-        Rot_est = pim_so3(H_new[r])
-        Rot_est = np.real(Rot_est)
-        err_with_j_synch = j_conj_err(Rot_est, Rot_list[r])
-        err_with_j_synch_acc.append(err_with_j_synch)
+    for Lambda in tqdm.tqdm(Lambda_range):
+        err_no_j_acc = []
+        err_with_j_acc = []
+        err_with_j_synch_acc = []
+        H_list = []
+        Rot_list = []
+        for r in range(R):
+            # generate samples according to R_ij = {R_i^T R_j, J R_i^TR_jJ}, where J=diag(1,1,-1)
+            Rot, H = generate_data_so3(N, Lambda)
+            # H = H * N / Lambda
+            # err with no J conj
+            Rot_est = pim_so3(H)
+            Rot_est = np.real(Rot_est)
+            err_no_j = j_conj_err(Rot_est, Rot)
+            err_no_j_acc.append(err_no_j)
+            H, J_conj_dict = apply_j(H, p=0.5)
 
-    err_no_j_vec.append(np.mean(err_no_j_acc))
-    err_no_j_vec_std.append(np.std(err_no_j_acc))
-    err_with_j_vec.append(np.mean(err_with_j_acc))
-    err_with_j_vec_std.append(np.std(err_with_j_acc))
-    err_with_j_synch_vec.append(np.mean(err_with_j_synch_acc))
-    err_with_j_synch_vec_std.append(np.std(err_with_j_synch_acc))
+            # err with J conj without J-synch
+            Rot_est = pim_so3(H)
+            Rot_est = np.real(Rot_est)
+            err_with_j = j_conj_err(Rot_est, Rot)
+            err_with_j_acc.append(err_with_j)
 
-fig, ax = plt.subplots()
-plot_with_confidence(Lambda_range, err_no_j_vec,err_no_j_vec_std, 'err without J ambiguity', fig, ax)
-plot_with_confidence(Lambda_range, err_with_j_vec, err_with_j_vec_std, 'err with J ambiguity', fig, ax)
-plot_with_confidence(Lambda_range, err_with_j_synch_vec, err_with_j_synch_vec_std, 'err with J ambiguity using J-Synch', fig, ax)
-plt.xlabel('$SNR$')
-plt.ylabel('Alignment Error')
-plt.title(f'Error comparison with N={N}')
-plt.legend()
-plt.show()
-# print('err = ', err_pim)
+            # error with J conj and J-synch
+            H_list.append(np.asarray(H, np.float32))
+            Rot_list.append(Rot)
+
+        H_new, u_s = j_synch_forward(np.asarray(H_list))
+        for r in range(R):
+            Rot_est = pim_so3(H_new[r])
+            Rot_est = np.real(Rot_est)
+            err_with_j_synch = j_conj_err(Rot_est, Rot_list[r])
+            err_with_j_synch_acc.append(err_with_j_synch)
+
+        err_no_j_vec.append(np.mean(err_no_j_acc))
+        err_no_j_vec_std.append(np.std(err_no_j_acc))
+        err_with_j_vec.append(np.mean(err_with_j_acc))
+        err_with_j_vec_std.append(np.std(err_with_j_acc))
+        err_with_j_synch_vec.append(np.mean(err_with_j_synch_acc))
+        err_with_j_synch_vec_std.append(np.std(err_with_j_synch_acc))
+
+    fig, ax = plt.subplots()
+    plot_with_confidence(Lambda_range, err_no_j_vec, err_no_j_vec_std, 'err without J ambiguity', fig, ax)
+    plot_with_confidence(Lambda_range, err_with_j_vec, err_with_j_vec_std, 'err with J ambiguity', fig, ax)
+    plot_with_confidence(Lambda_range, err_with_j_synch_vec, err_with_j_synch_vec_std,
+                         'err with J ambiguity using J-Synch', fig, ax)
+    plt.xlabel('$SNR$')
+    plt.ylabel('Alignment Error')
+    plt.title(f'Error comparison with N={N}')
+    plt.legend()
+    plt.show()
+    # print('err = ', err_pim)
