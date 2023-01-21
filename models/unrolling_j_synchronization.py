@@ -128,6 +128,9 @@ class SigmaBlock(keras.layers.Layer):
         self.shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
         self.global_indices = global_indices
         self.N = N
+        self.dense_1 = Dense(1, activation='tanh')
+        self.dense_2 = Dense(1, activation='tanh')
+        self.dense_3 = Dense(1, activation='tanh')
 
     def get_config(self):
         config = super().get_config()
@@ -138,18 +141,25 @@ class SigmaBlock(keras.layers.Layer):
         return config
 
     def call(self, err):
-        #todo: replace with MLP
-        min_ind = tf.argmin(err, axis=-1)
-        mu_ij_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 4), 2),tf.float32)
-        mu_jk_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 2), 2),tf.float32)
-        mu_ki_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 1), 2),tf.float32)
+        # #todo: replace with MLP
+        # min_ind = tf.argmin(err, axis=-1)
+        # mu_ij_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 4), 2),tf.float32)
+        # mu_jk_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 2), 2),tf.float32)
+        # mu_ki_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 1), 2),tf.float32)
+        # d1 = mu_ij_opt - mu_jk_opt
+        # d2 = mu_jk_opt - mu_ki_opt
+        # d3 = mu_ki_opt - mu_ij_opt
+
+        d1 = tf.squeeze(self.dense_1(err),axis=-1)
+        d2 = tf.squeeze(self.dense_2(err),axis=-1)
+        d3 = tf.squeeze(self.dense_3(err),axis=-1)
 
         res1 = tf.map_fn(lambda x: tf.scatter_nd(indices=self.global_indices._ij_jk, updates=x, shape=self.shape),
-                         tf.pow(-1., mu_ij_opt - mu_jk_opt))
+                         tf.pow(-1., d1))
         res2 = tf.map_fn(lambda x: tf.scatter_nd(indices=self.global_indices._jk_ki, updates=x, shape=self.shape),
-                         tf.pow(-1., mu_jk_opt - mu_ki_opt))
+                         tf.pow(-1., d2))
         res3 = tf.map_fn(lambda x: tf.scatter_nd(indices=self.global_indices._ki_ij, updates=x, shape=self.shape),
-                         tf.pow(-1., mu_ki_opt - mu_ij_opt))
+                         tf.pow(-1., d3))
         Sigma = res1 + res2 + res3
         Sigma = Sigma + tf.transpose(Sigma, perm=[0, 2, 1])
         return Sigma
@@ -204,6 +214,65 @@ class CorrectJAmbiguityBlock(keras.layers.Layer):
 
         H = H1_scatter + H2_scatter
         return H
+
+# def generate_indices(N, batchsize) -> dict:
+#     print('@'*50)
+#     print('generate_indices function call')
+#     d = {}
+#     pair_dict = {}
+#     idx = 0
+#     for i in range(N):
+#         for j in range(i + 1, N):
+#             pair_dict[(i, j)] = idx
+#             pair_dict[(j, i)] = idx
+#             idx += 1
+#
+#     d['_ijs'] = []
+#     d['_jks']= []
+#     d['_kis'] = []
+#     d['_ij_jk'] = []
+#     d['_jk_ki'] = []
+#     d['_ki_ij'] = []
+#     indices = []
+#     for i in range(N):
+#         for j in range(i + 1, N):
+#             for k in range(j + 1, N):
+#                 d['_ijs'].append(pair_dict[(i, j)])
+#                 d['_jks'].append(pair_dict[(j, k)])
+#                 d['_kis'].append(pair_dict[(k, i)])
+#                 d['_ij_jk'].append((d['_ijs'][-1], d['_jks'][-1]))
+#                 d['_jk_ki'].append((d['_jks'][-1], d['_kis'][-1]))
+#                 d['_ki_ij'].append((d['_kis'][-1], d['_ijs'][-1]))
+#                 indices.append((i, j, k))
+#
+#     d['ijs'] = []
+#     d['jks'] = []
+#     d['kis'] = []
+#     for b in range(batchsize):
+#         for i, idx in enumerate(indices):
+#             for x in range(3):
+#                 for y in range(3):
+#                     d['ijs'].append([b, 3 * idx[0] + x, 3 * idx[1] + y])
+#                     d['jks'].append([b, 3 * idx[1] + x, 3 * idx[2] + y])
+#                     d['kis'].append([b, 3 * idx[2] + x, 3 * idx[0] + y])
+#
+#     d['ijs'] = tf.constant(np.asarray(d['ijs']))
+#     d['jks'] = tf.constant(np.asarray(d['jks']))
+#     d['kis'] = tf.constant(np.asarray(d['kis']))
+#
+#     d['gather_idx'] = []
+#     d['gather_idx2'] = []
+#     d['u_s_gather_idx'] = []
+#     for b in range(batchsize):
+#         for i in range(N):
+#             for j in range(i + 1, N):
+#                 # todo: this is just increasing (range)
+#                 d['u_s_gather_idx'].append([b, pair_dict[(i, j)], 0])
+#                 for x in range(3):
+#                     for y in range(3):
+#                         d['gather_idx'].append([b, 3 * i + x, 3 * j + y])
+#                         d['gather_idx2'].append([b, 3 * j + x, 3 * i + y])
+#     return d
 
 class IndexGeneration:
     def __init__(self, N, batchsize):
@@ -288,6 +357,7 @@ def BuildModel(N, DEPTH, batchsize):
     Y = keras.layers.Input((3*N, 3*N))
 
     global_indices = IndexGeneration(N, batchsize)
+    # global_indices = generate_indices(N, batchsize)
 
     j_configuration_error = JConfigurationErrorBlock(N, batchsize, global_indices)(Y)
 
