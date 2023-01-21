@@ -23,6 +23,7 @@ def task(N, R, Lambda, DEPTH, seed, epochs):
     s_val, Y_val, j_gt_val = generate_training_data_so3_with_j_ambiguity(N,Lambda,R)
 
     batchsize = 10
+    assert R % batchsize == 0
     model = BuildModel(N, DEPTH, batchsize)
     # s_init = initialize_batch_matrix(R,N)
     # s_init2 = initialize_batch_matrix(R,N)
@@ -32,12 +33,16 @@ def task(N, R, Lambda, DEPTH, seed, epochs):
 
     # ----
     # Generate test data
-    s, Y, j_gt = generate_training_data_so3_with_j_ambiguity(N,Lambda,batchsize)
-    j_init = initialize_j_est(batchsize,N)
+    s, Y, j_gt = generate_training_data_so3_with_j_ambiguity(N,Lambda,R)
+    j_init = initialize_j_est(R,N)
     # x_est, loss_nn = EvaluateModel(model, Y, j_gt, j_init)
-    j_est = model.predict([j_init, Y])
-    j_est = np.sign(j_est)
-    loss_nn = loss_z_over_2(j_gt, j_est)
+    j_ests = []
+    for i in range(int(R/batchsize)):
+        j_est = model.predict([j_init[i*batchsize:(i+1)*batchsize], Y[i*batchsize:(i+1)*batchsize]])
+        j_est = np.sign(j_est)
+        j_ests.append(j_est)
+    j_ests = np.vstack(j_ests)
+    loss_nn = loss_z_over_2(j_gt, j_ests)
     print('[Learend J-Synch] loss = %f' % loss_nn)
 
     _, u_s = j_synch_forward(Y, depth=DEPTH)
