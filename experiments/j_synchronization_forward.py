@@ -1,5 +1,6 @@
 from common.math_utils import rel_error_so3
 from data_generation.generate_data_so3 import generate_data_so3, apply_j
+from models.unrolling_j_synchronization import IndexGeneration
 from synchronization.pim import pim_so3
 import numpy as np
 import tqdm
@@ -45,7 +46,7 @@ def calc_pair_dict(N):
             idx +=1
     return d
 
-def calc_err(H) -> tf.Tensor:
+def calc_err(H, global_indices) -> tf.Tensor:
     """
     Calc error vector for each triplet
     :param H: relative rotation matrix of size (batch_size, 3*N, 3*N)
@@ -56,12 +57,12 @@ def calc_err(H) -> tf.Tensor:
 
     H_j_conj = J_block @ H @ J_block
 
-    H_ij = tf.reshape(tf.gather_nd(H, ijs), (-1, 3, 3))
-    H_ij_j_conj = tf.reshape(tf.gather_nd(H_j_conj, ijs), (-1, 3, 3))
-    H_jk = tf.reshape(tf.gather_nd(H, jks), (-1, 3, 3))
-    H_jk_j_conj = tf.reshape(tf.gather_nd(H_j_conj, jks), (-1, 3, 3))
-    H_ki = tf.reshape(tf.gather_nd(H, kis), (-1, 3, 3))
-    H_ki_j_conj = tf.reshape(tf.gather_nd(H_j_conj, kis), (-1, 3, 3))
+    H_ij = tf.reshape(tf.gather_nd(H, global_indices.ijs), (-1, 3, 3))
+    H_ij_j_conj = tf.reshape(tf.gather_nd(H_j_conj, global_indices.ijs), (-1, 3, 3))
+    H_jk = tf.reshape(tf.gather_nd(H, global_indices.jks), (-1, 3, 3))
+    H_jk_j_conj = tf.reshape(tf.gather_nd(H_j_conj, global_indices.jks), (-1, 3, 3))
+    H_ki = tf.reshape(tf.gather_nd(H, global_indices.kis), (-1, 3, 3))
+    H_ki_j_conj = tf.reshape(tf.gather_nd(H_j_conj, global_indices.kis), (-1, 3, 3))
 
     j_comb = tf.stack([H_ij @ H_jk @ H_ki,
                        H_ij @ H_jk @ H_ki_j_conj,
@@ -84,7 +85,7 @@ def calc_mu(err_rs: tf.Tensor) -> (tf.Tensor, tf.Tensor, tf.Tensor):
     mu_ki_opt = tf.math.floormod(min_ind / 1, 2)
     return mu_ij_opt, mu_jk_opt, mu_ki_opt
 
-def build_sigma(mu_ij_opt: tf.Tensor, mu_jk_opt: tf.Tensor, mu_ki_opt: tf.Tensor, N: int) -> tf.Tensor:
+def build_sigma(mu_ij_opt: tf.Tensor, mu_jk_opt: tf.Tensor, mu_ki_opt: tf.Tensor, N: int, global_indices: IndexGeneration) -> tf.Tensor:
     """
     Build the matrix sigma from mu_ij_opt, mu_jk_opt, mu_ki_opt
     :param mu_ij_opt:
@@ -94,17 +95,17 @@ def build_sigma(mu_ij_opt: tf.Tensor, mu_jk_opt: tf.Tensor, mu_ki_opt: tf.Tensor
     """
     shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
 
-    res1 = tf.map_fn(lambda x: tf.scatter_nd(indices=_ij_jk, updates=x, shape=shape),
+    res1 = tf.map_fn(lambda x: tf.scatter_nd(indices=global_indices._ij_jk, updates=x, shape=shape),
                      tf.pow(-1., mu_ij_opt - mu_jk_opt))
-    res2 = tf.map_fn(lambda x: tf.scatter_nd(indices=_jk_ki, updates=x, shape=shape),
+    res2 = tf.map_fn(lambda x: tf.scatter_nd(indices=global_indices._jk_ki, updates=x, shape=shape),
                      tf.pow(-1., mu_jk_opt - mu_ki_opt))
-    res3 = tf.map_fn(lambda x: tf.scatter_nd(indices=_ki_ij, updates=x, shape=shape),
+    res3 = tf.map_fn(lambda x: tf.scatter_nd(indices=global_indices._ki_ij, updates=x, shape=shape),
                      tf.pow(-1., mu_ki_opt - mu_ij_opt))
     Sigma = res1 + res2 + res3
     Sigma = Sigma + tf.transpose(Sigma, perm=[0, 2, 1])
     return Sigma
 
-def unroll_pim(sigma: tf.Tensor, depth: int = 100) -> tf.Tensor:
+def unroll_pim(sigma: tf.Tensor, depth, global_indices) -> tf.Tensor:
     """
     Perform unrolled power iteration on input sigma
     :param sigma: Input matrix of size (batch_size , (N - 1) * N / 2 , (N - 1) * N / 2)
@@ -119,16 +120,16 @@ def unroll_pim(sigma: tf.Tensor, depth: int = 100) -> tf.Tensor:
         v = v_new
     return v_new
 
-def correct_j_ambiguity(H: tf.Tensor, u_s: tf.Tensor) -> tf.Tensor:
+def correct_j_ambiguity(H: tf.Tensor, u_s: tf.Tensor, global_indices) -> tf.Tensor:
     """
     Correct J ambiguity of H according to the estimate u_s
     :param H: Input relative rotation matrix, of size (batch_size, 3*N, 3*N)
     :param u_s: Estimated eigenvector of Sigma, indicates which pair contains J ambiguity
     :return: H without J ambiguity
     """
-    u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, u_s_gather_idx), 0), (H.shape[0], -1)), H.dtype)
-    H_gather = tf.reshape(tf.gather_nd(H, gather_idx), (H.shape[0], -1, 3, 3))
-    H_gather2 = tf.reshape(tf.gather_nd(H, gather_idx2), (H.shape[0], -1, 3, 3))
+    u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, global_indices.u_s_gather_idx), 0), (H.shape[0], -1)), H.dtype)
+    H_gather = tf.reshape(tf.gather_nd(H, global_indices.gather_idx), (H.shape[0], -1, 3, 3))
+    H_gather2 = tf.reshape(tf.gather_nd(H, global_indices.gather_idx2), (H.shape[0], -1, 3, 3))
     without_j = tf.repeat(
         tf.expand_dims(tf.repeat(tf.expand_dims(tf.eye(3, dtype=H.dtype), axis=0), u_s_gather.shape[1], axis=0), axis=0),
         u_s_gather.shape[0], axis=0)
@@ -143,30 +144,29 @@ def correct_j_ambiguity(H: tf.Tensor, u_s: tf.Tensor) -> tf.Tensor:
     H_conj = J_mat @ H_gather @ J_mat
     H2_conj = J_mat @ H_gather2 @ J_mat
 
-    H1_scatter = tf.scatter_nd(gather_idx, tf.reshape(H_conj, -1), shape=H.shape)
-    H2_scatter = tf.scatter_nd(gather_idx2, tf.reshape(H2_conj, -1), shape=H.shape)
+    H1_scatter = tf.scatter_nd(global_indices.gather_idx, tf.reshape(H_conj, -1), shape=H.shape)
+    H2_scatter = tf.scatter_nd(global_indices.gather_idx2, tf.reshape(H2_conj, -1), shape=H.shape)
 
     H = H1_scatter + H2_scatter
     return H
 
-def j_synch_forward(H: np.ndarray, depth: int):
+def j_synch_forward(H: np.ndarray, depth: int, global_indices: IndexGeneration):
     N = int(H.shape[1]/3)
-    global_index_generation(N, H.shape[0])
 
     # calc error among different possibilities
-    err_rs = calc_err(H)
+    err_rs = calc_err(H, global_indices)
 
     # calc mu
     mu_ij_opt, mu_jk_opt, mu_ki_opt = calc_mu(err_rs)
 
     # Build the matrix Sigma
-    Sigma = build_sigma(mu_ij_opt, mu_jk_opt, mu_ki_opt, N)
+    Sigma = build_sigma(mu_ij_opt, mu_jk_opt, mu_ki_opt, N, global_indices)
 
     # Unroll PIM
-    u_s = unroll_pim(Sigma, depth=depth)
+    u_s = unroll_pim(Sigma, depth, global_indices)
 
     # Correct J ambiguity
-    # H = correct_j_ambiguity(H, u_s)
+    # H_new = correct_j_ambiguity(H, u_s, global_indices)
 
     return H, tf.sign(u_s)
 

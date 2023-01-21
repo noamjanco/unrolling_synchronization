@@ -87,6 +87,16 @@ class JConfigurationErrorBlock(keras.layers.Layer):
         self.J_block = tf.expand_dims(tf.linalg.diag(tf.tile((1., 1., -1.), [N])), axis=0)
         self.global_indices = global_indices
         self.batchsize = batchsize
+        self.N = N
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "N": self.N,
+            "batchsize": self.batchsize,
+            "global_indices": self.global_indices,
+        })
+        return config
 
     def call(self, H):
         H_j_conj = self.J_block @ H @ self.J_block
@@ -117,6 +127,15 @@ class SigmaBlock(keras.layers.Layer):
         super(SigmaBlock, self).__init__()
         self.shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
         self.global_indices = global_indices
+        self.N = N
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "N": self.N,
+            "global_indices": self.global_indices,
+        })
+        return config
 
     def call(self, err):
         #todo: replace with MLP
@@ -153,6 +172,13 @@ class CorrectJAmbiguityBlock(keras.layers.Layer):
         super(CorrectJAmbiguityBlock, self).__init__()
         self.global_indices = global_indices
 
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "global_indices": self.global_indices,
+        })
+        return config
+
     def call(self, H, u_s):
         u_s_gather = tf.cast(tf.reshape(tf.less(tf.gather_nd(u_s, self.global_indices.u_s_gather_idx), 0), (H.shape[0], -1)), tf.float32)
         H_gather = tf.reshape(tf.gather_nd(H, self.global_indices.gather_idx), (H.shape[0], -1, 3, 3))
@@ -187,6 +213,9 @@ class IndexGeneration:
         :param batchsize: Number of samples in batch
         :return: None
         """
+        super(IndexGeneration, self).__init__()
+        self.N = N
+        self.batchsize = batchsize
         pair_dict = {}
         idx = 0
         for i in range(N):
@@ -241,7 +270,14 @@ class IndexGeneration:
                             self.gather_idx.append([b, 3 * i + x, 3 * j + y])
                             self.gather_idx2.append([b, 3 * j + x, 3 * i + y])
 
-# def loss_so3(y_true,y_pred):
+    # def get_config(self):
+    #     config = super().get_config()
+    #     config.update({
+    #         "N": self.N,
+    #         "batchsize": self.batchsize,
+    #     })
+    #     return config
+                        # def loss_so3(y_true,y_pred):
 #     loss = 1 - tf.reduce_mean(tf.reduce_sum(tf.reduce_sum(tf.math.pow(tf.matmul(tf.transpose(y_true,perm=[0, 2, 1]),y_pred),2),axis=2),axis=1)/(y_true.shape[1]/3 * np.sqrt(3))**2)
 #
 #     return loss
@@ -301,7 +337,7 @@ class CustomCallback(tf.keras.callbacks.Callback):
         keys = list(logs.keys())
         print("End epoch {} of training; got log keys: {}".format(epoch, keys))
 
-def TrainModel(model, Y, x, x_init, x_init2, Y_val,x_val,x_val_init,x_val_init2,epochs, batchsize):
+def TrainModel(model, Y, j_gt, j_init, Y_val, j_gt_val, j_init_val, epochs, batchsize):
     log_dir = "logs/fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=log_dir, histogram_freq=1, write_graph=True,
                                                           write_images=True, profile_batch=0)
@@ -314,13 +350,14 @@ def TrainModel(model, Y, x, x_init, x_init2, Y_val,x_val,x_val_init,x_val_init2,
         mode='min',
         save_best_only=True)
 
-    model.fit(x=[x_init,x_init2, Y],
-              y=x.astype(np.float32),
+    model.fit(x=[j_init, Y],
+              y=j_gt.astype(np.float32),
               epochs=epochs,
-              validation_data=([x_val_init,x_val_init2, Y_val], x_val.astype(np.float32)),
+              validation_data=([j_init_val, Y_val], j_gt_val.astype(np.float32)),
               # validation_freq=20,
               # callbacks=[tensorboard_callback, model_checkpoint_callback, CustomCallback(log_dir)],
-              callbacks=[tensorboard_callback, model_checkpoint_callback],
+              # callbacks=[tensorboard_callback, model_checkpoint_callback],
+              callbacks=[tensorboard_callback],
               batch_size=batchsize)
               # batch_size=5000)
 
