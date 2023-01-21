@@ -128,9 +128,12 @@ class SigmaBlock(keras.layers.Layer):
         self.shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
         self.global_indices = global_indices
         self.N = N
-        self.dense_1 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.ones())
-        self.dense_2 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.ones())
-        self.dense_3 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.ones())
+        stddev = 3
+        self.hidden_1 = Dense(64, activation='relu',kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        self.hidden_2 = Dense(8, activation='relu',kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        self.dense_1 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        self.dense_2 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        self.dense_3 = Dense(1, activation='tanh',kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
 
     def get_config(self):
         config = super().get_config()
@@ -150,9 +153,11 @@ class SigmaBlock(keras.layers.Layer):
         # d2 = mu_jk_opt - mu_ki_opt
         # d3 = mu_ki_opt - mu_ij_opt
 
-        d1 = tf.squeeze(self.dense_1(err),axis=-1)
-        d2 = tf.squeeze(self.dense_2(err),axis=-1)
-        d3 = tf.squeeze(self.dense_3(err),axis=-1)
+        hidden_1 = self.hidden_1(err)
+        hidden_2 = self.hidden_2(hidden_1)
+        d1 = tf.squeeze(self.dense_1(hidden_2),axis=-1)
+        d2 = tf.squeeze(self.dense_2(hidden_2),axis=-1)
+        d3 = tf.squeeze(self.dense_3(hidden_2),axis=-1)
 
         res1 = tf.map_fn(lambda x: tf.scatter_nd(indices=self.global_indices._ij_jk, updates=x, shape=self.shape),
                          tf.pow(-1., d1))
@@ -172,6 +177,7 @@ class SynchronizationLayer(keras.layers.Layer):
     def call(self, Y, x):
         x1 = tf.matmul(Y, x)
         # x_new = tf.divide(x1,(tf.sqrt(tf.reduce_sum(tf.pow(x1, 2), axis=-1, keepdims=True)))+1e-8)
+        # x_new = tf.divide(x1,tf.expand_dims(tf.linalg.norm(x1,axis=1),axis=-1))
         x_new = tf.divide(x1,tf.expand_dims(tf.linalg.norm(x1,axis=1),axis=-1))
 
         return x_new
@@ -215,64 +221,6 @@ class CorrectJAmbiguityBlock(keras.layers.Layer):
         H = H1_scatter + H2_scatter
         return H
 
-# def generate_indices(N, batchsize) -> dict:
-#     print('@'*50)
-#     print('generate_indices function call')
-#     d = {}
-#     pair_dict = {}
-#     idx = 0
-#     for i in range(N):
-#         for j in range(i + 1, N):
-#             pair_dict[(i, j)] = idx
-#             pair_dict[(j, i)] = idx
-#             idx += 1
-#
-#     d['_ijs'] = []
-#     d['_jks']= []
-#     d['_kis'] = []
-#     d['_ij_jk'] = []
-#     d['_jk_ki'] = []
-#     d['_ki_ij'] = []
-#     indices = []
-#     for i in range(N):
-#         for j in range(i + 1, N):
-#             for k in range(j + 1, N):
-#                 d['_ijs'].append(pair_dict[(i, j)])
-#                 d['_jks'].append(pair_dict[(j, k)])
-#                 d['_kis'].append(pair_dict[(k, i)])
-#                 d['_ij_jk'].append((d['_ijs'][-1], d['_jks'][-1]))
-#                 d['_jk_ki'].append((d['_jks'][-1], d['_kis'][-1]))
-#                 d['_ki_ij'].append((d['_kis'][-1], d['_ijs'][-1]))
-#                 indices.append((i, j, k))
-#
-#     d['ijs'] = []
-#     d['jks'] = []
-#     d['kis'] = []
-#     for b in range(batchsize):
-#         for i, idx in enumerate(indices):
-#             for x in range(3):
-#                 for y in range(3):
-#                     d['ijs'].append([b, 3 * idx[0] + x, 3 * idx[1] + y])
-#                     d['jks'].append([b, 3 * idx[1] + x, 3 * idx[2] + y])
-#                     d['kis'].append([b, 3 * idx[2] + x, 3 * idx[0] + y])
-#
-#     d['ijs'] = tf.constant(np.asarray(d['ijs']))
-#     d['jks'] = tf.constant(np.asarray(d['jks']))
-#     d['kis'] = tf.constant(np.asarray(d['kis']))
-#
-#     d['gather_idx'] = []
-#     d['gather_idx2'] = []
-#     d['u_s_gather_idx'] = []
-#     for b in range(batchsize):
-#         for i in range(N):
-#             for j in range(i + 1, N):
-#                 # todo: this is just increasing (range)
-#                 d['u_s_gather_idx'].append([b, pair_dict[(i, j)], 0])
-#                 for x in range(3):
-#                     for y in range(3):
-#                         d['gather_idx'].append([b, 3 * i + x, 3 * j + y])
-#                         d['gather_idx2'].append([b, 3 * j + x, 3 * i + y])
-#     return d
 
 class IndexGeneration:
     def __init__(self, N, batchsize):
@@ -376,7 +324,7 @@ def BuildModel(N, DEPTH, batchsize):
 
     model = Model(inputs=[v_in, Y], outputs=v)
 
-    opt = keras.optimizers.Adam(learning_rate=0.01) # working 18:07
+    opt = keras.optimizers.Adam(learning_rate=0.0001)
     model.compile(optimizer=opt, loss=loss_z_over_2)
     model.summary()
     return model
@@ -424,7 +372,7 @@ def TrainModel(model, Y, j_gt, j_init, Y_val, j_gt_val, j_init_val, epochs, batc
               y=j_gt.astype(np.float32),
               epochs=epochs,
               validation_data=([j_init_val, Y_val], j_gt_val.astype(np.float32)),
-              # validation_freq=20,
+              validation_freq=20,
               # callbacks=[tensorboard_callback, model_checkpoint_callback, CustomCallback(log_dir)],
               # callbacks=[tensorboard_callback, model_checkpoint_callback],
               callbacks=[tensorboard_callback],
