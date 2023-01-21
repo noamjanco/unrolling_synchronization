@@ -142,7 +142,8 @@ class SynchronizationLayer(keras.layers.Layer):
 
     def call(self, Y, x):
         x1 = tf.matmul(Y, x)
-        x_new = tf.divide(x1,(tf.sqrt(tf.reduce_sum(tf.pow(x1, 2), axis=-1, keepdims=True)))+1e-8)
+        # x_new = tf.divide(x1,(tf.sqrt(tf.reduce_sum(tf.pow(x1, 2), axis=-1, keepdims=True)))+1e-8)
+        x_new = tf.divide(x1,tf.expand_dims(tf.linalg.norm(x1,axis=1),axis=-1))
 
         return x_new
 
@@ -279,7 +280,6 @@ def EvaluateModel(model, H, j_gt, j_init):
     j_est = model.predict([j_init, H])
     j_est = tf.math.sign(j_est)
     loss = loss_z_over_2(j_gt, j_est)
-    print('[NN] loss = %lf' % loss)
     return j_est, loss
 
 

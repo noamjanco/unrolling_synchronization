@@ -34,10 +34,13 @@ def task(N, R, Lambda, DEPTH, seed, epochs):
     # Generate test data
     s, Y, j_gt = generate_training_data_so3_with_j_ambiguity(N,Lambda,batchsize)
     j_init = initialize_j_est(batchsize,N)
-    x_est, loss_nn = EvaluateModel(model, Y, j_gt, j_init)
+    # x_est, loss_nn = EvaluateModel(model, Y, j_gt, j_init)
+    j_est = model.predict([j_init, Y])
+    j_est = np.sign(j_est)
+    loss_nn = loss_z_over_2(j_gt, j_est)
     print('[Learend J-Synch] loss = %f' % loss_nn)
 
-    _, u_s = j_synch_forward(Y)
+    _, u_s = j_synch_forward(Y, depth=DEPTH)
     loss_j_synch = loss_z_over_2(j_gt, u_s)
     print('[J-Synch] loss = %f' % loss_j_synch)
 
@@ -92,7 +95,8 @@ if __name__ == '__main__':
     # CompareSO3UnrollingExperiment(params={'N': 20, 'R': 1000, 'num_trials': 1, 'depth_range': [1, 3, 5, 9, 15, 20, 50], 'epochs': 200, 'Lambda': 1.2})
     # CompareSO3UnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1,3,5,9,15,20,50], 'epochs': 500, 'Lambda': 1.5})
     # CompareSO3UnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1,3,5,9,15,20], 'epochs': 500, 'Lambda': 1.2})
-    CompareSO3UnrollingJSynchExperiment(params={'N': 20, 'R': 100, 'num_trials': 1, 'depth_range': [9], 'epochs': 100, 'Lambda': 9.})
+    # CompareSO3UnrollingJSynchExperiment(params={'N': 20, 'R': 100, 'num_trials': 1, 'depth_range': [9], 'epochs': 100, 'Lambda': 9.})
+    CompareSO3UnrollingJSynchExperiment(params={'N': 20, 'R': 100, 'num_trials': 1, 'depth_range': [9], 'epochs': 100, 'Lambda': 5.})
     # CompareSO3UnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [1,3,5,9,15,20], 'epochs': 100, 'Lambda': 1.5})
     # CompareSO3UnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [9], 'epochs': 20, 'Lambda': 1.5})
     # CompareSO3UnrollingExperiment(params={'N': 20, 'R': 10000, 'num_trials': 1, 'depth_range': [9], 'epochs': 10, 'Lambda': 1.2})

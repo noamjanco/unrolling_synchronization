@@ -149,7 +149,7 @@ def correct_j_ambiguity(H: tf.Tensor, u_s: tf.Tensor) -> tf.Tensor:
     H = H1_scatter + H2_scatter
     return H
 
-def j_synch_forward(H: np.ndarray):
+def j_synch_forward(H: np.ndarray, depth: int):
     N = int(H.shape[1]/3)
     global_index_generation(N, H.shape[0])
 
@@ -163,10 +163,10 @@ def j_synch_forward(H: np.ndarray):
     Sigma = build_sigma(mu_ij_opt, mu_jk_opt, mu_ki_opt, N)
 
     # Unroll PIM
-    u_s = unroll_pim(Sigma, depth=100)
+    u_s = unroll_pim(Sigma, depth=depth)
 
     # Correct J ambiguity
-    H = correct_j_ambiguity(H, u_s)
+    # H = correct_j_ambiguity(H, u_s)
 
     return H, tf.sign(u_s)
 
