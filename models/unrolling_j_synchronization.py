@@ -83,13 +83,25 @@ from models.unrolling_synchronization_z_over_2 import loss_z_over_2
 class JConfigurationErrorBlock(keras.layers.Layer):
     def __init__(self, N, batchsize, global_indices):
         super(JConfigurationErrorBlock, self).__init__()
-        self.learned_eye = tf.Variable(tf.eye(3),trainable=False)
+        self.learned_eye = tf.Variable(tf.eye(3), trainable=False)
         # self.learned_eye = tf.eye(3)
         self.J_block = tf.expand_dims(tf.linalg.diag(tf.tile((1., 1., -1.), [N])), axis=0)
         self.global_indices = global_indices
         self.batchsize = batchsize
         self.N = N
         self.shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
+        # self.hidden_1 = Dense(1, activation='relu', kernel_initializer=tf.keras.initializers.ones())
+        # self.bn1 = keras.layers.BatchNormalization()
+        # self.bn2 = keras.layers.BatchNormalization()
+        # self.bn3 = keras.layers.BatchNormalization()
+        stddev = 5
+        self.hidden_11 = Dense(256, activation='relu', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        self.hidden_12 = Dense(1, activation='sigmoid', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        self.hidden_21 = Dense(256, activation='relu', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        self.hidden_22 = Dense(1, activation='sigmoid', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        self.hidden_31 = Dense(256, activation='relu', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        self.hidden_32 = Dense(1, activation='sigmoid', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        # self.activation_layer = tf.keras.layers.Activation('sigmoid')
 
     def get_config(self):
         config = super().get_config()
@@ -135,15 +147,32 @@ class JConfigurationErrorBlock(keras.layers.Layer):
         #                tf.reduce_min(tf.stack([err000, err001, err100, err101],axis=1), axis=-1))
         # mu_ki_opt = tf.less(tf.reduce_min(tf.stack([err001, err011, err101, err111],axis=1), axis=-1),
         #                tf.reduce_min(tf.stack([err000, err010, err100, err110],axis=1), axis=-1))
-        mu_ij_opt = tf.less(tf.reduce_min(tf.stack([err100, err101, err110, err111], axis=1), axis=-1),
-                             tf.reduce_min(tf.stack([err000, err001, err010, err011], axis=1), axis=-1))
-        mu_jk_opt = tf.less(tf.reduce_min(tf.stack([err010, err011, err100, err101], axis=1), axis=-1),
-                             tf.reduce_min(tf.stack([err000, err001, err110, err111], axis=1), axis=-1))
-        mu_ki_opt = tf.less(tf.reduce_min(tf.stack([err001, err011, err100, err110], axis=1), axis=-1),
-                             tf.reduce_min(tf.stack([err000, err010, err101, err111], axis=1), axis=-1))
-        mu_ij_opt = tf.cast(mu_ij_opt, H.dtype)
-        mu_jk_opt = tf.cast(mu_jk_opt, H.dtype)
-        mu_ki_opt = tf.cast(mu_ki_opt, H.dtype)
+        diff1 = tf.reduce_min(tf.stack([err100, err101, err110, err111], axis=1), axis=-1) - \
+                tf.reduce_min(tf.stack([err000, err001, err010, err011], axis=1), axis=-1)
+
+        diff2 = tf.reduce_min(tf.stack([err010, err011, err100, err101], axis=1), axis=-1) - \
+                tf.reduce_min(tf.stack([err000, err001, err110, err111], axis=1), axis=-1)
+
+        diff3 = tf.reduce_min(tf.stack([err001, err011, err100, err110], axis=1), axis=-1) - \
+                tf.reduce_min(tf.stack([err000, err010, err101, err111], axis=1), axis=-1)
+
+        # mu_ij_opt = self.activation_layer(tf.expand_dims(diff1,axis=-1))
+        # mu_jk_opt = self.activation_layer(tf.expand_dims(diff2,axis=-1))
+        # mu_ki_opt = self.activation_layer(tf.expand_dims(diff3,axis=-1))
+
+        # diff1 = self.bn1(diff1)
+        # diff2 = self.bn1(diff2)
+        # diff3 = self.bn1(diff3)
+        mu_ij_opt = self.hidden_11(tf.expand_dims(diff1,axis=-1))
+        mu_ij_opt = self.hidden_12(mu_ij_opt)
+
+        mu_jk_opt = self.hidden_21(tf.expand_dims(diff2,axis=-1))
+        mu_jk_opt = self.hidden_22(mu_jk_opt)
+
+        mu_ki_opt = self.hidden_31(tf.expand_dims(diff3,axis=-1))
+        mu_ki_opt = self.hidden_32(mu_ki_opt)
+
+
         # err = tf.linalg.norm(j_comb - self.learned_eye, axis=[2, 3])
         # err = tf.reduce_sum(tf.pow(j_comb - self.learned_eye,2), axis=[2, 3])
 
@@ -384,7 +413,7 @@ def BuildModel(N, DEPTH, batchsize):
 
     model = Model(inputs=[v_in, Y], outputs=v)
 
-    opt = keras.optimizers.Adam(learning_rate=1e-5)
+    opt = keras.optimizers.Adam(learning_rate=1e-3)
     model.compile(optimizer=opt, loss=loss_z_over_2)
     model.summary()
     return model
