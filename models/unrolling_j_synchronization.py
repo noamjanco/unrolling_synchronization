@@ -83,7 +83,8 @@ from models.unrolling_synchronization_z_over_2 import loss_z_over_2
 class JConfigurationErrorBlock(keras.layers.Layer):
     def __init__(self, N, batchsize, global_indices):
         super(JConfigurationErrorBlock, self).__init__()
-        self.learned_eye = tf.Variable(tf.eye(3), trainable=False)
+        self.learned_eye = tf.Variable(tf.eye(3), trainable=True)
+        self.alpha = tf.Variable(1000*tf.ones(1), trainable=True)
         # self.learned_eye = tf.eye(3)
         self.J_block = tf.expand_dims(tf.linalg.diag(tf.tile((1., 1., -1.), [N])), axis=0)
         self.global_indices = global_indices
@@ -91,17 +92,19 @@ class JConfigurationErrorBlock(keras.layers.Layer):
         self.N = N
         self.shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
         # self.hidden_1 = Dense(1, activation='relu', kernel_initializer=tf.keras.initializers.ones())
-        # self.bn1 = keras.layers.BatchNormalization()
-        # self.bn2 = keras.layers.BatchNormalization()
-        # self.bn3 = keras.layers.BatchNormalization()
+        self.bn1 = keras.layers.BatchNormalization()
+        self.bn2 = keras.layers.BatchNormalization()
+        self.bn3 = keras.layers.BatchNormalization()
         stddev = 5
-        self.hidden_11 = Dense(256, activation='relu', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        n_hidden_layer = 256
+        self.hidden_11 = Dense(n_hidden_layer, activation='relu', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
         self.hidden_12 = Dense(1, activation='sigmoid', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
-        self.hidden_21 = Dense(256, activation='relu', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        self.hidden_21 = Dense(n_hidden_layer, activation='relu', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
         self.hidden_22 = Dense(1, activation='sigmoid', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
-        self.hidden_31 = Dense(256, activation='relu', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
+        self.hidden_31 = Dense(n_hidden_layer, activation='relu', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
         self.hidden_32 = Dense(1, activation='sigmoid', kernel_initializer=tf.keras.initializers.RandomNormal(stddev=stddev))
-        # self.activation_layer = tf.keras.layers.Activation('sigmoid')
+        self.activation_layer = tf.keras.layers.Activation('sigmoid')
+        self.activation_layer2 = tf.keras.layers.Activation('tanh')
 
     def get_config(self):
         config = super().get_config()
@@ -147,8 +150,9 @@ class JConfigurationErrorBlock(keras.layers.Layer):
         #                tf.reduce_min(tf.stack([err000, err001, err100, err101],axis=1), axis=-1))
         # mu_ki_opt = tf.less(tf.reduce_min(tf.stack([err001, err011, err101, err111],axis=1), axis=-1),
         #                tf.reduce_min(tf.stack([err000, err010, err100, err110],axis=1), axis=-1))
-        diff1 = tf.reduce_min(tf.stack([err100, err101, err110, err111], axis=1), axis=-1) - \
-                tf.reduce_min(tf.stack([err000, err001, err010, err011], axis=1), axis=-1)
+
+        # diff1 = tf.reduce_min(tf.stack([err100, err101, err110, err111], axis=1), axis=-1) - \
+        #         tf.reduce_min(tf.stack([err000, err001, err010, err011], axis=1), axis=-1)
 
         diff2 = tf.reduce_min(tf.stack([err010, err011, err100, err101], axis=1), axis=-1) - \
                 tf.reduce_min(tf.stack([err000, err001, err110, err111], axis=1), axis=-1)
@@ -156,103 +160,65 @@ class JConfigurationErrorBlock(keras.layers.Layer):
         diff3 = tf.reduce_min(tf.stack([err001, err011, err100, err110], axis=1), axis=-1) - \
                 tf.reduce_min(tf.stack([err000, err010, err101, err111], axis=1), axis=-1)
 
-        # mu_ij_opt = self.activation_layer(tf.expand_dims(diff1,axis=-1))
-        # mu_jk_opt = self.activation_layer(tf.expand_dims(diff2,axis=-1))
-        # mu_ki_opt = self.activation_layer(tf.expand_dims(diff3,axis=-1))
+        mu_ij_opt = 1
+        mu_jk_opt = self.activation_layer(diff2 * self.alpha)
+        mu_ki_opt = self.activation_layer(diff3 * self.alpha)
+
+
+        # mu_ij_opt = diff1
+        # mu_jk_opt = diff2
+        # mu_ki_opt = diff3
+        # alpha = 1000
 
         # diff1 = self.bn1(diff1)
-        # diff2 = self.bn1(diff2)
-        # diff3 = self.bn1(diff3)
-        mu_ij_opt = self.hidden_11(tf.expand_dims(diff1,axis=-1))
-        mu_ij_opt = self.hidden_12(mu_ij_opt)
+        # diff2 = self.bn2(diff2)
+        # diff3 = self.bn3(diff3)
 
-        mu_jk_opt = self.hidden_21(tf.expand_dims(diff2,axis=-1))
-        mu_jk_opt = self.hidden_22(mu_jk_opt)
-
-        mu_ki_opt = self.hidden_31(tf.expand_dims(diff3,axis=-1))
-        mu_ki_opt = self.hidden_32(mu_ki_opt)
+        # mu_ij_opt = self.hidden_11(tf.expand_dims(diff1,axis=-1))
+        # mu_ij_opt = self.hidden_12(mu_ij_opt)
+        #
+        # mu_jk_opt = self.hidden_21(tf.expand_dims(diff2,axis=-1))
+        # mu_jk_opt = self.hidden_22(mu_jk_opt)
+        #
+        # mu_ki_opt = self.hidden_31(tf.expand_dims(diff3,axis=-1))
+        # mu_ki_opt = self.hidden_32(mu_ki_opt)
 
 
         # err = tf.linalg.norm(j_comb - self.learned_eye, axis=[2, 3])
         # err = tf.reduce_sum(tf.pow(j_comb - self.learned_eye,2), axis=[2, 3])
 
         # return tf.reshape(err, (self.batchsize, -1, 8))
-        d1 = mu_ij_opt - mu_jk_opt
-        d2 = mu_jk_opt - mu_ki_opt
-        d3 = mu_ki_opt - mu_ij_opt
+        d1 = mu_jk_opt - mu_ij_opt
+        d2 = mu_ki_opt - mu_jk_opt
+        d3 = mu_ij_opt - mu_ki_opt
+
         d1 = tf.reshape(d1, (self.batchsize, -1))
         d2 = tf.reshape(d2, (self.batchsize, -1))
         d3 = tf.reshape(d3, (self.batchsize, -1))
 
-        res1 = tf.map_fn(lambda x: tf.scatter_nd(indices=self.global_indices._ij_jk, updates=x, shape=self.shape),
-                         tf.pow(-1., d1))
-        res2 = tf.map_fn(lambda x: tf.scatter_nd(indices=self.global_indices._jk_ki, updates=x, shape=self.shape),
-                         tf.pow(-1., d2))
-        res3 = tf.map_fn(lambda x: tf.scatter_nd(indices=self.global_indices._ki_ij, updates=x, shape=self.shape),
-                         tf.pow(-1., d3))
-        Sigma = res1 + res2 + res3
-        Sigma = Sigma + tf.transpose(Sigma, perm=[0, 2, 1])
-        return Sigma
+        s1 = 1-2*tf.abs(d1)
+        s2 = 1-2*tf.abs(d2)
+        s3 = 1-2*tf.abs(d3)
 
-class SigmaBlock(keras.layers.Layer):
-    def __init__(self, N, global_indices):
-        super(SigmaBlock, self).__init__()
-        self.shape = (int((N - 1) * N / 2), int((N - 1) * N / 2))
-        self.global_indices = global_indices
-        self.N = N
-        stddev = 5
-        activation = 'tanh'
-        self.hidden_1 = Dense(8, activation=activation)
-        self.hidden_2 = Dense(8, activation=activation)
-        self.hidden_3 = Dense(8, activation=activation)
-        self.hidden_4 = Dense(8, activation=activation)
-        self.dense_1 = Dense(1, kernel_initializer=tf.keras.initializers.ones())
-        self.dense_2 = Dense(1, kernel_initializer=tf.keras.initializers.ones())
-        self.dense_3 = Dense(1, kernel_initializer=tf.keras.initializers.ones())
-        # self.bn = keras.layers.BatchNormalization()
-        # self.bn2 = keras.layers.BatchNormalization()
-        # self.bn3 = keras.layers.BatchNormalization()
-        # self.bn4 = keras.layers.BatchNormalization()
+        # d1 = self.hidden_11(tf.expand_dims(d1,axis=-1))
+        # d1 = self.hidden_12(d1)
+        # d2 = self.hidden_21(tf.expand_dims(d2,axis=-1))
+        # d2 = self.hidden_22(d2)
+        # d3 = self.hidden_31(tf.expand_dims(d3,axis=-1))
+        # d3 = self.hidden_32(d3)
 
-    def get_config(self):
-        config = super().get_config()
-        config.update({
-            "N": self.N,
-            "global_indices": self.global_indices,
-        })
-        return config
 
-    def call(self, err):
-        # #todo: replace with MLP
-        # min_ind = tf.argmin(err, axis=-1)
-        # mu_ij_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 4), 2),tf.float32)
-        # mu_jk_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 2), 2),tf.float32)
-        # mu_ki_opt = tf.cast(tf.math.floormod(tf.floor(min_ind / 1), 2),tf.float32)
 
-        # bn = self.bn(err)
-        # err = err - tf.reduce_min(err,axis=-1,keepdims=True)
-        # err = err/tf.reduce_max(err,axis=-1,keepdims=True)
-        hidden_1 = self.hidden_1(err)
-        # hidden_1 = self.bn2(hidden_1)
-        hidden_2 = self.hidden_2(hidden_1)
-        # hidden_2 = self.bn3(hidden_2)
-        hidden_3 = self.hidden_3(hidden_2)
-        # hidden_3 = self.bn3(hidden_3)
-        hidden_4 = self.hidden_4(hidden_3)
-        # hidden_4 = self.bn4(hidden_4)
-        mu_ij_opt = tf.squeeze(self.dense_1(hidden_4),axis=-1)
-        mu_jk_opt = tf.squeeze(self.dense_2(hidden_4),axis=-1)
-        mu_ki_opt = tf.squeeze(self.dense_3(hidden_4),axis=-1)
-        d1 = mu_ij_opt - mu_jk_opt
-        d2 = mu_jk_opt - mu_ki_opt
-        d3 = mu_ki_opt - mu_ij_opt
+        # d1 = self.activation_layer2(d1)
+        # d2 = self.activation_layer2(d2)
+        # d3 = self.activation_layer2(d3)
 
         res1 = tf.map_fn(lambda x: tf.scatter_nd(indices=self.global_indices._ij_jk, updates=x, shape=self.shape),
-                         tf.pow(-1., d1))
+                         s1)
         res2 = tf.map_fn(lambda x: tf.scatter_nd(indices=self.global_indices._jk_ki, updates=x, shape=self.shape),
-                         tf.pow(-1., d2))
+                         s2)
         res3 = tf.map_fn(lambda x: tf.scatter_nd(indices=self.global_indices._ki_ij, updates=x, shape=self.shape),
-                         tf.pow(-1., d3))
+                         s3)
         Sigma = res1 + res2 + res3
         Sigma = Sigma + tf.transpose(Sigma, perm=[0, 2, 1])
         return Sigma
@@ -413,7 +379,7 @@ def BuildModel(N, DEPTH, batchsize):
 
     model = Model(inputs=[v_in, Y], outputs=v)
 
-    opt = keras.optimizers.Adam(learning_rate=1e-3)
+    opt = keras.optimizers.Adam(learning_rate=1e-5)
     model.compile(optimizer=opt, loss=loss_z_over_2)
     model.summary()
     return model
