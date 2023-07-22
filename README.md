@@ -1,4 +1,4 @@
-# unrolling_synchronization
+# Unrolled algorithms for group synchronization
 This is the python & TensorFlow implementation of the experiments conducted in "Unrolled algorithms for group synchronization" (https://arxiv.org/abs/2207.09418).
 
 In this work we developed unrolled algorithms for several group synchronization instances, including synchronization over the group of 3-D rotations: the synchronization problem in cryo-EM. We also apply a similar approach to the multi-reference alignment problem. We show by numerical experiments that the unrolling strategy outperforms existing synchronization algorithms in a wide variety of scenarios.
