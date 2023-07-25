@@ -68,7 +68,7 @@ def BuildModelMLP(N,Lambda,DEPTH):
         x = SingleLayer(output_size=hidden_size)(x)
 
     x = SingleLayer(output_size=N)(x)
-
+    x = keras.activations.tanh(x)
     x = tf.expand_dims(x,axis=-1)
     model = Model(inputs=[v_in,v_in2, Y], outputs=x)
     opt = keras.optimizers.Adam(learning_rate=0.0001) # working 18:07
