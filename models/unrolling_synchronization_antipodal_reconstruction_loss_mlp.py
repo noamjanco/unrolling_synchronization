@@ -24,13 +24,14 @@ def BuildModel(L,N,Lambda,DEPTH):
     y = keras.layers.Input((L, N)) #complete data matrix
 
     y_reshaped = tf.reshape(y, (tf.shape(y)[0],L*N))
-    hidden_size = L*N
+    hidden_size = L
 
     x = SingleLayer(output_size=hidden_size)(y_reshaped)
     for i in range(DEPTH):
         x = SingleLayer(output_size=hidden_size)(x)
 
     x_est = SingleLayer(output_size=L)(x)
+    x_est = tf.expand_dims(x_est,axis=-1)
 
 
     model = Model(inputs=[v_in,v_in2, Y, y], outputs=x_est)
